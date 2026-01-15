@@ -1,0 +1,494 @@
+{
+  "annual_cost": 340548,
+  "monthly_average_cost": 28379,
+  "is_many_times_applied": true,
+  "many_times_start_event": 4,
+  "events": [
+    {
+      "event": 1,
+      "applied_limit": 252600,
+      "is_many_times": false,
+      "applied": 13098
+    },
+    {
+      "event": 2,
+      "applied_limit": 252600,
+      "is_many_times": false,
+      "applied": 13098
+    },
+    {
+      "event": 3,
+      "applied_limit": 252600,
+      "is_many_times": false,
+      "applied": 13098
+    },
+    {
+      "event": 4,
+      "applied_limit": 140100,
+      "is_many_times": true,
+      "applied": 13098
+    },
+    {
+      "event": 5,
+      "applied_limit": 140100,
+      "is_many_times": true,
+      "applied": 13098
+    },
+    {
+      "event": 6,
+      "applied_limit": 140100,
+      "is_many_times": true,
+      "applied": 13098
+    },
+    {
+      "event": 7,
+      "applied_limit": 140100,
+      "is_many_times": true,
+      "applied": 13098
+    },
+    {
+      "event": 8,
+      "applied_limit": 140100,
+      "is_many_times": true,
+      "applied": 13098
+    },
+    {
+      "event": 9,
+      "applied_limit": 140100,
+      "is_many_times": true,
+      "applied": 13098
+    },
+    {
+      "event": 10,
+      "applied_limit": 140100,
+      "is_many_times": true,
+      "applied": 13098
+    },
+    {
+      "event": 11,
+      "applied_limit": 140100,
+      "is_many_times": true,
+      "applied": 13098
+    },
+    {
+      "event": 12,
+      "applied_limit": 140100,
+      "is_many_times": true,
+      "applied": 13098
+    },
+    {
+      "event": 13,
+      "applied_limit": 140100,
+      "is_many_times": true,
+      "applied": 13098
+    },
+    {
+      "event": 14,
+      "applied_limit": 140100,
+      "is_many_times": true,
+      "applied": 13098
+    },
+    {
+      "event": 15,
+      "applied_limit": 140100,
+      "is_many_times": true,
+      "applied": 13098
+    },
+    {
+      "event": 16,
+      "applied_limit": 140100,
+      "is_many_times": true,
+      "applied": 13098
+    },
+    {
+      "event": 17,
+      "applied_limit": 140100,
+      "is_many_times": true,
+      "applied": 13098
+    },
+    {
+      "event": 18,
+      "applied_limit": 140100,
+      "is_many_times": true,
+      "applied": 13098
+    },
+    {
+      "event": 19,
+      "applied_limit": 140100,
+      "is_many_times": true,
+      "applied": 13098
+    },
+    {
+      "event": 20,
+      "applied_limit": 140100,
+      "is_many_times": true,
+      "applied": 13098
+    },
+    {
+      "event": 21,
+      "applied_limit": 140100,
+      "is_many_times": true,
+      "applied": 13098
+    },
+    {
+      "event": 22,
+      "applied_limit": 140100,
+      "is_many_times": true,
+      "applied": 13098
+    },
+    {
+      "event": 23,
+      "applied_limit": 140100,
+      "is_many_times": true,
+      "applied": 13098
+    },
+    {
+      "event": 24,
+      "applied_limit": 140100,
+      "is_many_times": true,
+      "applied": 13098
+    },
+    {
+      "event": 25,
+      "applied_limit": 140100,
+      "is_many_times": true,
+      "applied": 13098
+    },
+    {
+      "event": 26,
+      "applied_limit": 140100,
+      "is_many_times": true,
+      "applied": 13098
+    }
+  ],
+  "biologic_only": {
+    "annual_cost": 340548,
+    "monthly_average_cost": 28379,
+    "is_many_times_applied": true,
+    "many_times_start_event": 4,
+    "events": [
+      {
+        "event": 1,
+        "applied_limit": 252600,
+        "is_many_times": false,
+        "applied": 13098
+      },
+      {
+        "event": 2,
+        "applied_limit": 252600,
+        "is_many_times": false,
+        "applied": 13098
+      },
+      {
+        "event": 3,
+        "applied_limit": 252600,
+        "is_many_times": false,
+        "applied": 13098
+      },
+      {
+        "event": 4,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 5,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 6,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 7,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 8,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 9,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 10,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 11,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 12,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 13,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 14,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 15,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 16,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 17,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 18,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 19,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 20,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 21,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 22,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 23,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 24,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 25,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 26,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      }
+    ]
+  },
+  "biologic_plus_existing": {
+    "annual_cost": 340548,
+    "monthly_average_cost": 28379,
+    "is_many_times_applied": true,
+    "many_times_start_event": 4,
+    "events": [
+      {
+        "event": 1,
+        "applied_limit": 252600,
+        "is_many_times": false,
+        "applied": 13098
+      },
+      {
+        "event": 2,
+        "applied_limit": 252600,
+        "is_many_times": false,
+        "applied": 13098
+      },
+      {
+        "event": 3,
+        "applied_limit": 252600,
+        "is_many_times": false,
+        "applied": 13098
+      },
+      {
+        "event": 4,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 5,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 6,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 7,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 8,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 9,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 10,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 11,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 12,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 13,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 14,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 15,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 16,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 17,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 18,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 19,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 20,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 21,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 22,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 23,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 24,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 25,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      },
+      {
+        "event": 26,
+        "applied_limit": 140100,
+        "is_many_times": true,
+        "applied": 13098
+      }
+    ]
+  },
+  "existing_cost_for_event": 0,
+  "difference_annual_cost": 0
+}

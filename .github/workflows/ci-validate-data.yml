@@ -1,0 +1,54 @@
+name: Validate Data Assets (mapping / unit_map / master_id_map / drug_price)
+
+on:
+  pull_request:
+    paths:
+      - "data/**"
+      - "mapping.yaml"
+      - ".github/workflows/ci-validate-data.yml"
+
+jobs:
+  validate-data:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml pandas jsonschema
+
+      - name: Validate mapping.yaml
+        run: |
+          python scripts/validate_mapping.py mapping.yaml
+
+      - name: Validate unit_map.csv
+        run: |
+          python scripts/validate_unit_map.py data/unit_map.csv
+
+      - name: Validate master_id_map.csv (immutability)
+        run: |
+          python scripts/validate_master_id_map.py \
+            data/master_id_map.csv \
+            history/master_id_map_latest.csv
+
+      - name: Validate drug price CSV (schema & price diff)
+        run: |
+          python scripts/validate_drug_price.py \
+            data/drug_price_current.csv \
+            history/drug_price_previous.csv \
+            data/validator_rules.yaml
+
+      - name: Upload validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-report
+          path: reports/

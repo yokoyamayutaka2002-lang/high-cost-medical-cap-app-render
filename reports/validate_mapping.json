@@ -1,0 +1,15 @@
+{
+  "status": "fail",
+  "errors": [
+    {
+      "type": "YAML_PARSE_ERROR",
+      "file": "C:\\Users\\yokoy\\OneDrive\\デスクトップ\\High cost medical app\\High-cost-medical-app\\data\\mapping.yaml",
+      "row_or_key": "",
+      "message": "Failed to parse YAML: PyYAML is required to parse mapping.yaml"
+    }
+  ],
+  "summary": {
+    "error_count": 1,
+    "warning_count": 0
+  }
+}

@@ -1,0 +1,57 @@
+name: Generate Viewer Screenshots
+
+on:
+  workflow_dispatch:
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run screenshot generator
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          mkdir -p artifacts/screenshots
+          node scripts/generate_screenshots.js
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-screenshots
+          path: artifacts/**
+
+      - name: Post PR comment with artifacts
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: |
+          python3 scripts/post_screenshot_comment.py
+
+  merge-gate_unresolved:
+    name: merge-gate / unresolved-issues-check
+    runs-on: ubuntu-latest
+    needs: [screenshots]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run merge-gate check
+        run: |
+          python3 ci/check_unresolved_issues.py

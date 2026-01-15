@@ -1,0 +1,15 @@
+{
+  "status": "fail",
+  "errors": [
+    {
+      "type": "FILE_NOT_FOUND",
+      "file": "C:\\Users\\yokoy\\OneDrive\\デスクトップ\\High cost medical app\\High-cost-medical-app\\data\\unit_map.csv",
+      "row_or_key": "",
+      "message": "unit_map.csv not found"
+    }
+  ],
+  "summary": {
+    "error_count": 1,
+    "warning_count": 0
+  }
+}

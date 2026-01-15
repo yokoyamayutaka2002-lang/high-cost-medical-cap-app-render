@@ -1,0 +1,21 @@
+price_change_threshold:
+  warn: 0.10
+  error: 0.30
+
+unmapped_rows:
+  bootstrap:
+    mode: WARN
+    max_rows: 5
+  steady:
+    mode: FAIL
+
+provisional_limit:
+  warn_if_over: 10
+
+weeks_per_unit:
+  allow_null: false
+  allow_zero: false
+
+approval:
+  required_labels:
+    - "domain-approved"
