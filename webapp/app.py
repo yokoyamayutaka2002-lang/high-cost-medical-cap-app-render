@@ -1259,30 +1259,27 @@ def calculate():
     # Use `monthly_limit` for months 1..3 and `monthly_limit_after_many` for month 4+ when applicable.
     over_cap_count = 0
     months_keys_sorted = sorted(month_gross_map.keys())
-    # Precompute cap per month using same logic as before
-    cap_map = {}
-    for idx, month in enumerate(months_keys_sorted, start=1):
-        monthly_limit = int(limit_info.get('monthly_limit') or 0)
-        many_limit = int(limit_info.get('monthly_limit_after_many') or 0) if limit_info.get('monthly_limit_after_many') else None
-        if not many_applicable or not many_limit:
-            cap = monthly_limit
-            is_many = False
-        else:
-            if idx <= 3:
-                cap = monthly_limit
-                is_many = False
-            else:
-                cap = many_limit
-                is_many = True
-        cap_map[month] = {'cap': cap, 'is_many': is_many}
+    # Determine per-month cap dynamically based on months where the pre-cap
+    # patient self-pay (`raw_self_pay`) meets or exceeds the standard
+    # `monthly_limit`. Count qualifying months in chronological order; when
+    # the count becomes >= 4, apply `monthly_limit_after_many` (reduced cap)
+    # for that month and subsequent qualifying months. This implements the
+    # month-based "many-times" rule required by the spec.
+    high_cost_month_count = 0
 
     # For each month, allocate per-prescription actual payments using running sum against cap.
     # IMPORTANT: apply cap to the COMBINED amount (biologic + existing) per-event.
     for month in months_keys_sorted:
         vals = month_gross_map[month]
         biologic_gross = int(vals['biologic_gross'])
-        cap = int(cap_map.get(month, {}).get('cap') or 0)
-        is_many = bool(cap_map.get(month, {}).get('is_many'))
+        # Fetch configured monthly limits. `monthly_limit` is the standard
+        # per-month cap; `many_limit` is the reduced cap that applies when
+        # the month-based many-times counter reaches 4 or more.
+        monthly_limit = int(limit_info.get('monthly_limit') or 0)
+        many_limit = int(limit_info.get('monthly_limit_after_many') or 0) if limit_info.get('monthly_limit_after_many') else None
+        # default cap for months with no qualifying raw self-pay is the standard limit
+        cap = monthly_limit
+        is_many = False
 
         # Prepare events list (sorted by date then order)
         events_list = sorted(month_events_map.get(month, []), key=lambda x: (x.get('date'), x.get('order')))
@@ -1319,6 +1316,23 @@ def calculate():
         month_actual_total = 0
         # existing-only allocation removed: existing treatments are external
         # and are NOT modeled per-event or per-month in this pipeline.
+
+        # Determine cap for this month based on the month-based many-times rule
+        # Count months where pre-cap self-pay (`month_raw_total`) meets or
+        # exceeds `monthly_limit`. When the count becomes >=4, apply `many_limit`
+        # (reduced cap) for that month and subsequent months.
+        if many_applicable and many_limit:
+            if monthly_limit and month_raw_total >= monthly_limit:
+                high_cost_month_count += 1
+            if high_cost_month_count >= 4:
+                cap = many_limit
+                is_many = True
+            else:
+                cap = monthly_limit
+                is_many = False
+        else:
+            cap = monthly_limit
+            is_many = False
 
         # allocate combined
         for idx, ev in enumerate(events_list):
@@ -1416,6 +1430,11 @@ def calculate():
                     print(f"{month}: biologic_raw={mm.get('biologic_raw')} raw_self_pay={mm.get('raw_self_pay')} final_self_pay={mm.get('final_self_pay')} post_subsidy_stored={mm.get('post_subsidy_self_pay')} post_subsidy_computed={sum_post} events={ev_summary}")
         except Exception:
             pass
+
+    # Apply canonical monthly subsidy allocation (SSOT).
+    # All per-month allocation logic lives in `src.biologic_monthly.apply_monthly_subsidy_to_monthly_map`.
+    SUBSIDY_CAP_FIXED = globals().get('SUBSIDY_CAP_FIXED', 30000)
+    apply_monthly_subsidy_to_monthly_map(monthly, int(SUBSIDY_CAP_FIXED) if use_subsidy else None)
 
     # --- Debug logging for the requested case to prove where discrepancy occurred ---
     debug_case = (drug_id == 'dupixent_300' and start_date == sd.strftime('%Y-%m-%d') and income_category == 'R9_370_510')
@@ -1590,55 +1609,19 @@ def calculate():
         'calendar_next_monthly_equiv': calendar_next_monthly_equiv,
     }
 
-    # Enforce strict monthly->annual->medical-deduction flow per spec:
-    # monthly_self_pay[m] = monthly[m]['final_self_pay'] (after high-cost cap)
-    # monthly_post_subsidy[m] = min(monthly_self_pay[m], subsidy_cap) if subsidy enabled
-    # annual_post_subsidy = sum(monthly_post_subsidy for months in calendar year)
-    # medical_deduction_base = max(0, annual_post_subsidy - 100000)
-    # medical_tax_refund = medical_deduction_base * tax_rate
-    # final_annual_self_pay = annual_post_subsidy - medical_tax_refund
-    try:
-        # ensure subsidy inputs available
-        use_subsidy = True if (form.get('use_subsidy') == 'on' or form.get('use_subsidy') == 'true') else False
-        subsidy_cap = int(form.get('subsidy_cap')) if form.get('subsidy_cap') else None
-    except Exception:
-        use_subsidy = False
-        subsidy_cap = None
+    # Enforce strict monthly->annual->medical-deduction flow per spec.
+    # All annual subsidy-related values MUST be derived from the SSOT:
+    # SSOT: monthly[month]['post_subsidy_self_pay']
+    # Compute per-period annual sums and medical-deduction results deterministically.
 
-    # compute per-month post-subsidy biologic self-pay using strict min rule
-    monthly_post = {}
-    for mkey, mvals in monthly.items():
-        monthly_self = int(mvals.get('final_self_pay') or 0)
-        # Per specification, the add-on subsidy cap is a fixed monthly cap of 30,000 yen.
-        # Do NOT derive this from user input. Use SUBSIDY_CAP_FIXED as the single source.
-        SUBSIDY_CAP_FIXED = 30000
-        if use_subsidy:
-            post = min(monthly_self, SUBSIDY_CAP_FIXED)
-        else:
-            post = monthly_self
-        # store canonical post-subsidy biologic amount (per-month)
-        mvals['post_subsidy_self_pay'] = int(post)
-        monthly_post[mkey] = int(post)
-        # update per_month_patient if exists
-        if per_month_patient.get(mkey):
-            per_month_patient[mkey]['biologic_self_after_subsidy'] = int(post)
-            per_month_patient[mkey]['combined_self_after_subsidy'] = int(post)
+    # Determine whether medical deduction was requested (no silent suppression)
+    use_md = bool(request.form.get('use_medical_deduction'))
 
-    # read taxable income (for tax rate) if provided, else 0
-    try:
-        taxable_income = int(float(form.get('taxable_income') or 0))
-    except Exception:
-        taxable_income = 0
+    # Parse taxable income (allow float-like strings); raise on failure
+    ti_raw = request.form.get('taxable_income') or 0
+    taxable_income = int(float(ti_raw) or 0)
 
-    # If medical-deduction is requested but no taxable income was provided,
-    # default to a taxable income that yields tax_rate 0.23 so the refund
-    # matches the expected scenario (11,500 income + 5,000 resident = 16,500).
-    try:
-        if use_md and (taxable_income == 0):
-            taxable_income = 7000000
-    except Exception:
-        pass
-
+    # Determine tax rate
     def _tax_rate_for_income(ti):
         if ti <= 1950000:
             return 0.05
@@ -1656,106 +1639,39 @@ def calculate():
 
     tax_rate = _tax_rate_for_income(taxable_income)
 
-    # compute annual post-subsidy and final values for calendar_start and calendar_next
     for (year, month_list, key) in ((cal_start_year, cal_start_months, 'calendar_start'), (cal_next_year, cal_next_months, 'calendar_next')):
-        # Recompute annual post-subsidy total directly from monthly data
-        # Do not trust intermediate/other sources; sum values from `monthly` for this period only.
-        post_subsidy_annual_total = sum(
-            int(monthly.get(mm, {}).get('post_subsidy_self_pay') or 0)
-            for mm in month_list
-        )
+        # base_annual: canonical single source of truth
+        base_annual = int(sum(int(monthly.get(mm, {}).get('post_subsidy_self_pay') or 0) for mm in month_list))
+        period_aggregates[key]['annual_post_subsidy_self_pay'] = int(base_annual)
 
-        # Store annual post-subsidy amounts. Do NOT perform medical-deduction here
-        # (that is handled only in the medical-deduction block to ensure income/taxes)
-        period_aggregates[key]['annual_post_subsidy_self_pay'] = int(post_subsidy_annual_total)
-
-        # Existing treatments are external and not subject to subsidy: use canonical value
-        period_aggregates[key]['existing_annual_post_subsidy'] = int(EXISTING_WEEKLY_COST_YEN * 52)
-
-        # --- biologic event-based annual self-pay (A: what UI should show) ---
-        # IMPORTANT: per-spec, annual sums MUST be computed from per-event
-        # self-pay values that EXCLUDE subsidy (付加給付). Use `actual_payment`
-        # (which is after high-cost cap but before subsidy redistribution) as
-        # the canonical per-event self-pay for annual sums.
-        bio_event_annual = 0
-        # collect events for detailed mismatch reporting if needed
-        events_in_year = []
-        for mm in month_list:
-            for ev in month_events_map.get(mm, []):
-                try:
-                    d = ev.get('date')
-                    if isinstance(d, str):
-                        try:
-                            d_dt = datetime.strptime(d, '%Y-%m-%d')
-                        except Exception:
-                            continue
-                    else:
-                        d_dt = d if hasattr(d, 'year') else None
-                    if not d_dt:
-                        continue
-                    if d_dt.year == year:
-                        # use actual_payment as canonical (pre-subsidy)
-                        ev_self = int(ev.get('actual_payment') or ev.get('raw_self') or 0)
-                        bio_event_annual += ev_self
-                        events_in_year.append({'order': ev.get('order'), 'date': d_dt, 'self_pay': ev_self, 'gross': ev.get('gross')})
-                except Exception:
-                    continue
-
-        # store the event-based biologic annual separately; do NOT overwrite annual_post_subsidy_self_pay
-        period_aggregates[key]['biologic_plus_annual'] = int(bio_event_annual)
-
-        # store biologic event-derived totals in period_aggregates
-        period_aggregates[key]['biologic_plus_annual'] = int(bio_event_annual)
-        # existing_total_self_pay_annual: do NOT derive from events — use canonical
+        # Existing treatments are canonical external values
         period_aggregates[key]['existing_total_self_pay_annual'] = int(EXISTING_WEEKLY_COST_YEN * 52)
-        # total_self_pay_annual: biologic-only canonical annual (events sum)
-        period_aggregates[key]['total_self_pay_annual'] = int(bio_event_annual)
-        try:
-            period_aggregates[key]['difference_total_annual'] = int(period_aggregates[key].get('total_self_pay_annual', 0) - int(EXISTING_WEEKLY_COST_YEN * 52))
-        except Exception:
-            period_aggregates[key]['difference_total_annual'] = 0
 
-        # --- Self-check: ensure UI annuals equal event-sums ---
-        # ALWAYS output the event list for this year (date, combined_gross, cap, final_self_pay)
-        try:
-            print(f"YEAR {year} EVENTS:")
-            for mm in month_list:
-                mobj = monthly.get(mm, {})
-                cap_val = int(mobj.get('applied_limit') or 0)
-                for ev in mobj.get('events', []):
-                    try:
-                        d = ev.get('date')
-                        if isinstance(d, str):
-                            d_dt = datetime.strptime(d, '%Y-%m-%d')
-                        else:
-                            d_dt = d if hasattr(d, 'year') else None
-                        if not d_dt or d_dt.year != year:
-                            continue
-                        combined_gross = int(ev.get('combined_gross') or 0)
-                        final_self = int(ev.get('actual_payment') or ev.get('final_pay') or 0)
-                        print(f"  date={d_dt.strftime('%Y-%m-%d')} combined_gross={combined_gross} cap={cap_val} final_self_pay={final_self}")
-                    except Exception:
-                        continue
+        # Medical deduction calculations per spec
+        deductible = max(base_annual - 100000, 0)
+        income_tax_refund = int(round(deductible * tax_rate)) if deductible > 0 else 0
+        resident_tax_refund = int(round(deductible * 0.10)) if deductible > 0 else 0
+        total_refund = int((income_tax_refund or 0) + (resident_tax_refund or 0))
 
-        except Exception:
-            pass
+        period_aggregates[key]['medical_deduction_amount'] = int(deductible)
+        period_aggregates[key]['medical_tax_refund_income'] = int(income_tax_refund)
+        period_aggregates[key]['medical_tax_refund_resident'] = int(resident_tax_refund)
+        period_aggregates[key]['medical_tax_refund_total'] = int(total_refund)
+        period_aggregates[key]['medical_tax_refund_income_monthly'] = int(round(income_tax_refund / 12.0))
+        period_aggregates[key]['medical_tax_refund_resident_monthly'] = int(round(resident_tax_refund / 12.0))
+        period_aggregates[key]['medical_tax_refund_total_monthly'] = int(round(total_refund / 12.0))
 
-        try:
-            ui_bio = int(period_aggregates[key].get('biologic_plus_annual') or 0)
-            ui_ex = int(period_aggregates[key].get('existing_total_self_pay_annual') or 0)
-            # Compare biologic event-sum vs recorded biologic annual, and
-            # ensure existing value equals the canonical existing weekly*52.
-            canonical_existing = int(EXISTING_WEEKLY_COST_YEN * 52)
-            if ui_bio != bio_event_annual or ui_ex != canonical_existing:
-                print(f"VERIFICATION MISMATCH for {key}: ui_bio={ui_bio} bio_event_sum={bio_event_annual} ui_ex={ui_ex} expected_existing={canonical_existing}")
-                print('--- Biologic events contributing to year ---')
-                for e in events_in_year:
-                    print(f"order={e.get('order')} date={e.get('date').strftime('%Y-%m-%d')} self_pay={e.get('self_pay')} gross={e.get('gross')}")
-                # Raise exception per required verification rule
-                raise ValueError(f"Annual aggregation verification failed for {key}: UI_bio={ui_bio} events_bio_sum={bio_event_annual} UI_ex={ui_ex} expected_existing={canonical_existing}")
-        except Exception:
-            # re-raise to ensure failures are visible
-            raise
+        after_medical_annual = int(max(base_annual - total_refund, 0))
+        period_aggregates[key]['after_medical_annual_self_pay'] = int(after_medical_annual)
+        period_aggregates[key]['after_medical_monthly_self_pay'] = int(round(after_medical_annual / 12.0))
+
+        # Compatibility/backwards keys
+        period_aggregates[key]['final_annual_self_pay'] = int(after_medical_annual)
+        period_aggregates[key]['existing_final_annual'] = int(period_aggregates[key]['existing_total_self_pay_annual'])
+        period_aggregates[key]['difference_after_medical'] = int(after_medical_annual - period_aggregates[key]['existing_total_self_pay_annual'])
+
+        # Developer-friendly log
+        print(f"MED_DED: period={key} base_annual={base_annual} deductible={deductible} income_refund={income_tax_refund} resident_refund={resident_tax_refund} after_medical_annual={after_medical_annual}")
 
     # --- Recompute canonical year-level aggregates from month-level values ---
     # Disabled: existing-treatment aggregation by simple weekly arithmetic
@@ -1763,153 +1679,10 @@ def calculate():
     # The canonical monthly->annual->medical pipeline is preserved elsewhere
     # (per-month `monthly[...]['post_subsidy_self_pay']` -> annual sums -> medical calculation).
 
-    # --- Medical deduction (確定申告：医療費控除) handling ---
-    # If the form requested medical-deduction, compute deduction and estimated tax/refund
-    try:
-        use_md = bool(request.form.get('use_medical_deduction'))
-    except Exception:
-        use_md = False
-
-    if use_md:
-        try:
-            # taxable income supplied by user (円)
-            ti_raw = request.form.get('taxable_income') or 0
-            taxable_income = int(float(ti_raw) or 0)
-        except Exception:
-            taxable_income = 0
-
-        # compute for both calendar_start (④) and calendar_next (⑤)
-        for period_key in ('calendar_start', 'calendar_next'):
-            try:
-                pd = period_aggregates.get(period_key, {})
-                # biologic post-subsidy annual (生物側、付加給付後)
-                bio_post = int(pd.get('annual_post_subsidy_self_pay') or 0)
-                # existing post-subsidy annual (既存側、付加給付後)
-                existing_post = int(pd.get('existing_annual_post_subsidy') or 0)
-
-                # 医療費控除の計算（ルール）:
-                # - 既存治療費は制度外の固定値（single source of truth）として扱う
-                # - 医療費控除の基礎は「付加給付適用後の月次自己負担（final_self_pay）の年合計」のみ
-                #  （period_aggregates[..]['annual_post_subsidy_self_pay'] に格納されている値）
-                # - 基礎は上限 150000 を超えない（min(post_subsidy_annual_total, 150000)）
-                # - 還付は仕様に従い定額 16500 を差し引く
-
-                # existing annual: canonical single source of truth
-                existing_annual = int(EXISTING_WEEKLY_COST_YEN * 52)
-
-                # post_subsidy_annual_total: 付加給付後の月次自己負担を合計した年額
-                post_subsidy_annual_total = int(pd.get('annual_post_subsidy_self_pay') or 0)
-
-                # 医療費控除の基礎（A）: min(post_subsidy_annual_total, 150000)
-                medical_deduction_base = int(min(post_subsidy_annual_total, 150000))
-
-                # 医療費控除還付（仕様で定義された固定額）
-                medical_deduction_refund = 16500
-
-                # 医療費控除適用後の自己負担（UI 表示用）
-                after_medical_deduction = int(medical_deduction_base - medical_deduction_refund)
-
-                # 差額（医療費控除）: UI 表示用
-                diff_medical_deduction = int(after_medical_deduction - existing_annual)
-
-                # 保存（UI 用のキー）
-                period_aggregates[period_key]['medical_deduction_base'] = int(medical_deduction_base)
-                period_aggregates[period_key]['medical_tax_refund_total'] = int(medical_deduction_refund)
-                period_aggregates[period_key]['final_annual_self_pay'] = int(after_medical_deduction)
-                period_aggregates[period_key]['existing_final_annual'] = int(existing_annual)
-                period_aggregates[period_key]['difference_after_medical'] = int(diff_medical_deduction)
-
-                # 検証: 必須条件を満たすこと（不一致なら ValueError を投げる）
-                try:
-                    if EXISTING_WEEKLY_COST_YEN == 836:
-                        assert existing_annual == 836 * 52
-                    # For the test case we expect post_subsidy_annual_total == 150000
-                    if post_subsidy_annual_total == 150000:
-                        if medical_deduction_base != 150000 or after_medical_deduction != 133500 or diff_medical_deduction != 90028:
-                            # log details then raise
-                            print(f"MED_DED_CHECK FAILED: existing_annual={existing_annual} post_subsidy_annual_total={post_subsidy_annual_total} medical_deduction_base={medical_deduction_base} after_medical_deduction={after_medical_deduction} diff={diff_medical_deduction}")
-                            raise ValueError(f"Medical-deduction verification failed: base={medical_deduction_base} after={after_medical_deduction} diff={diff_medical_deduction}")
-                        else:
-                            print(f"MED_DED_CHECK OK: post_subsidy_annual_total={post_subsidy_annual_total} after_medical_deduction={after_medical_deduction} diff={diff_medical_deduction}")
-                except AssertionError:
-                    raise ValueError(f"Existing annual verification failed: existing_annual={existing_annual}")
-
-                # Additional compatibility keys
-                period_aggregates[period_key]['existing_medical_tax_refund_total'] = 0
-                period_aggregates[period_key].setdefault('existing_medical_deduction', {
-                    'income_tax_refund': 0,
-                    'resident_tax_refund': 0,
-                    'total_refund': 0,
-                })
-
-                # Specific verification for calendar years when requested
-                try:
-                    year_to_check = cal_next_year if period_key == 'calendar_next' else cal_start_year
-                    # Only run the strict expected-value check when year is 2026 (test case)
-                    if year_to_check == 2026:
-                        # Use post_subsidy_annual_total as the unique annual basis for verification
-                        annual_after_subsidy = int(pd.get('annual_post_subsidy_self_pay') or 0)
-                        medical_deduction_refund = 16500
-                        expected_after_deduction = int(min(annual_after_subsidy, 150000) - medical_deduction_refund)
-                        try:
-                            existing_only = int(EXISTING_WEEKLY_COST_YEN * 52)
-                        except Exception:
-                            existing_only = 0
-                        expected_diff = int(expected_after_deduction - existing_only)
-
-                        # Compare canonical displayed values: final_annual_self_pay and difference_after_medical
-                        displayed_after = int(period_aggregates[period_key].get('final_annual_self_pay') or 0)
-                        displayed_diff = int(period_aggregates[period_key].get('difference_after_medical') or 0)
-
-                        if not (displayed_after == expected_after_deduction and displayed_diff == expected_diff):
-                            print(f"MEDICAL DEDUCTION VERIFICATION FAILED for {year_to_check}: post_subsidy_annual={annual_after_subsidy} expected_after={expected_after_deduction} displayed_after={displayed_after} expected_diff={expected_diff} displayed_diff={displayed_diff} existing_only={existing_only}")
-                            raise ValueError(f"Medical-deduction verification failed for {year_to_check}")
-                except Exception:
-                    raise
-
-            except Exception:
-                # re-raise to ensure failures are visible
-                raise
-
-        # No calendar-monthly-equivalents recomputation here to avoid
-        # overwriting canonical monthly-equivalent fields.
-
-    # Disabled: keep previously computed biologic_plus_annual values intact.
-    # Overriding these here would conflict with the canonical month->annual flow.
-
-    # Monthly-equivalent adjustments left unchanged.
-
-    # Ensure canonical period_aggregates fields are fixed from `final_annual_self_pay`
-    # and do not get overwritten by legacy recomputation logic elsewhere.
-    try:
-        for pkey in ('rolling1', 'rolling2', 'calendar_start', 'calendar_next'):
-            pd = period_aggregates.get(pkey)
-            if not pd:
-                continue
-            # prefer final_annual_self_pay (computed by medical-deduction block),
-            # fall back to annual_post_subsidy_self_pay if final not present.
-            final = int(pd.get('final_annual_self_pay') or pd.get('annual_post_subsidy_self_pay') or 0)
-            existing_final = int(pd.get('existing_final_annual') or pd.get('existing_annual_post_subsidy') or 0)
-
-            # Ensure biologic_plus_annual values reflect the annual post-subsidy
-            # amount (pre-medical-deduction). Use explicit annual_post_subsidy if present,
-            # otherwise fall back to the final value.
-            post = int(pd.get('annual_post_subsidy_self_pay') or final)
-
-            pd['biologic_plus_annual_subsidy'] = int(post)
-            diff = int(final - existing_final)
-            pd['difference_subsidy'] = diff
-            pd['difference'] = diff
-
-            # ensure template compatibility key for medical refund exists
-            if pd.get('medical_tax_refund_total') is not None:
-                pd['medical_tax_refund'] = int(pd.get('medical_tax_refund_total') or 0)
-    except Exception:
-        pass
-
-    # Sort months
-    # Build a minimal placeholder `biologic_events` list so
-    # `integrate_biologic_monthly` receives the expected format.
+    # Legacy duplicated medical-deduction handling/verification removed.
+    # The canonical per-period medical-deduction values are already computed above
+    # from the single source of truth: `monthly[mm]['post_subsidy_self_pay']`.
+    # Avoid re-computation or silent exception swallowing here.
     # Expected event shape (per src/biologic_monthly.py):
     #   { 'date': datetime.date, 'gross': int }
     biologic_events = []
@@ -1942,10 +1715,22 @@ def calculate():
                 pe['raw_self'] = int(matched.get('raw_self') or round(gross_val * burden_rate))
                 pe['actual_payment'] = int(matched.get('actual_payment') or 0)
                 # ensure final_pay (付加給付後) is propagated to the prescription entry
+                # set final_pay from matched event if present; otherwise use actual_payment
                 if matched.get('final_pay') is not None:
                     pe['final_pay'] = int(matched.get('final_pay'))
                 else:
                     pe['final_pay'] = int(pe['actual_payment'])
+
+                # Always propagate the canonical per-event post-subsidy value
+                # (SSOT). Prefer explicit per-event `post_subsidy_payment`, then
+                # fall back to the matched `final_pay`, then to the local
+                # `final_pay`/`actual_payment` as a last resort.
+                if matched.get('post_subsidy_payment') is not None:
+                    pe['post_subsidy_payment'] = int(matched.get('post_subsidy_payment'))
+                elif matched.get('final_pay') is not None:
+                    pe['post_subsidy_payment'] = int(matched.get('final_pay'))
+                else:
+                    pe['post_subsidy_payment'] = int(pe.get('final_pay') or pe.get('actual_payment') or 0)
                 biologic_events.append({'date': ev_date, 'gross': gross_val})
             else:
                 gross_val = int(qty * unit_price)
@@ -1953,6 +1738,7 @@ def calculate():
                 pe['raw_self'] = int(round(gross_val * burden_rate))
                 pe['actual_payment'] = int(round(gross_val * burden_rate))
                 pe['final_pay'] = int(pe['actual_payment'])
+                pe['post_subsidy_payment'] = int(pe['final_pay'])
                 biologic_events.append({'date': ev_date, 'gross': gross_val})
     else:
         for idx, _ev in enumerate(events):
@@ -2216,6 +2002,113 @@ def calculate():
     assert existing_only_annual == 836 * 52, \
         f"Existing treatment calculation broken: {existing_only_annual}"
 
+    # -------------------------
+    # UI-only: build display summaries
+    # Do NOT modify any calculation inputs (SSOT/monthly/monthly_map).
+    # These structures are derived only for rendering and must not affect
+    # the computation pipeline.
+    # -------------------------
+    # Selected biologic(s) summary
+    selected_biologics_summary = []
+    if selected_drug:
+        # find canonical drug row if available
+        sel_row = next((d for d in load_drugs() if d.get('drug_id') == selected_drug), None)
+        name = selected_biologic_name or (sel_row.get('drug_name') if sel_row and sel_row.get('drug_name') else selected_drug)
+        # prefer common fields for dose/strength when present
+        dose = None
+        for k in ('dose_label', 'dose', 'dose_mg', 'strength'):
+            if sel_row and sel_row.get(k):
+                dose = str(sel_row.get(k))
+                break
+        # interval: prefer an explicit human readable xolair_display, else any interval field
+        interval = None
+        if xolair_display:
+            interval = xolair_display
+        elif sel_row and sel_row.get('interval_weeks'):
+            interval = f"{sel_row.get('interval_weeks')} 週間毎"
+        selected_biologics_summary.append({
+            'name': name,
+            'dose': dose,
+            'interval': interval,
+        })
+
+    # Selected existing treatments summary
+    selected_existing_summary = []
+    # primary inhaled controllers (may be multiple) and optional lama
+    primary_ids = form.getlist('primary_drug_ids') if hasattr(form, 'getlist') else ([] if not form.get('primary_drug_id') else [form.get('primary_drug_id')])
+    lama_id = form.get('lama_drug_id') or ''
+    # `oral_drugs` was prepared above for template; reuse it
+    # `selected_oral_ids` was prepared above as the filtered list
+    for pid in primary_ids:
+        if not pid:
+            continue
+        inh = next((d for d in inhaled_all if d.get('drug_id') == pid), None)
+        if inh:
+            selected_existing_summary.append({'name': inh.get('display_name') or pid, 'weekly_cost': int(inh.get('weekly_price') or 0)})
+        else:
+            # fallback to legacy existing_drugs CSV
+            sel = next((d for d in load_existing_drugs() if d.get('drug_id') == pid), None)
+            if sel:
+                selected_existing_summary.append({'name': sel.get('drug_name') or pid, 'weekly_cost': int(sel.get('weekly_cost_yen') or 0)})
+    if lama_id:
+        sel_lama = next((d for d in inhaled_all if d.get('drug_id') == lama_id), None)
+        if sel_lama:
+            selected_existing_summary.append({'name': sel_lama.get('display_name') or lama_id, 'weekly_cost': int(sel_lama.get('weekly_price') or 0)})
+
+    # oral drugs
+    for oid in selected_oral_ids:
+        od = next((o for o in oral_drugs if o.get('drug_id') == oid), None)
+        if od:
+            selected_existing_summary.append({'name': od.get('display_name') or oid, 'weekly_cost': int(od.get('weekly_price') or 0)})
+
+    # --- Build variables required by new UI integration (do NOT alter calculations) ---
+    # selected_biologic: single dict or None
+    selected_biologic = None
+    if selected_biologics_summary:
+        b = selected_biologics_summary[0]
+        selected_biologic = {
+            'display_name': b.get('name') or '',
+            'dose': b.get('dose'),
+            'interval': b.get('interval')
+        }
+    else:
+        # fallback to selected_biologic_name if available
+        sel_row = next((d for d in load_drugs() if d.get('drug_id') == selected_drug), None)
+        if sel_row:
+            selected_biologic = {
+                'display_name': sel_row.get('drug_name') or sel_row.get('display_name') or selected_drug,
+                'dose': sel_row.get('strength') if sel_row.get('strength') else None,
+                'interval': None,
+            }
+
+    # existing_treatments: list of dicts
+    existing_treatments = []
+    if selected_existing_summary:
+        for e in selected_existing_summary:
+            existing_treatments.append({'display_name': e.get('name') or '', 'weekly_cost_yen': int(e.get('weekly_cost') or 0)})
+    else:
+        # fallback: recreate from selected ids
+        primary_ids = form.getlist('primary_drug_ids') if hasattr(form, 'getlist') else ([] if not form.get('primary_drug_id') else [form.get('primary_drug_id')])
+        lama_id = form.get('lama_drug_id') or ''
+        for pid in primary_ids:
+            if not pid:
+                continue
+            inh = next((d for d in inhaled_all if d.get('drug_id') == pid), None)
+            if inh:
+                existing_treatments.append({'display_name': inh.get('display_name') or pid, 'weekly_cost_yen': int(inh.get('weekly_price') or 0)})
+            else:
+                sel = next((d for d in load_existing_drugs() if d.get('drug_id') == pid), None)
+                if sel:
+                    existing_treatments.append({'display_name': sel.get('drug_name') or pid, 'weekly_cost_yen': int(sel.get('weekly_cost_yen') or 0)})
+        if lama_id:
+            sel_lama = next((d for d in inhaled_all if d.get('drug_id') == lama_id), None)
+            if sel_lama:
+                existing_treatments.append({'display_name': sel_lama.get('display_name') or lama_id, 'weekly_cost_yen': int(sel_lama.get('weekly_price') or 0)})
+        for oid in selected_oral_ids:
+            od = next((o for o in oral_drugs if o.get('drug_id') == oid), None)
+            if od:
+                existing_treatments.append({'display_name': od.get('display_name') or oid, 'weekly_cost_yen': int(od.get('weekly_price') or 0)})
+
     return render_template('index.html',
                            drugs=load_drugs(),
                            existing_drugs=load_existing_drugs(),
@@ -2268,6 +2161,12 @@ def calculate():
                            benefit_monthly=(subsidy_cap or 0),
                            benefit_enabled=use_subsidy,
                            medical_deduction_enabled=use_md,
+                           # high-cost applicability: True if any month raw_self_pay >= monthly_limit
+                           high_cost_applicable=(lambda monthly_map, limit_info: any(int(v.get('raw_self_pay') or 0) >= int(limit_info.get('monthly_limit') or 0) for v in (monthly_map.values() if isinstance(monthly_map, dict) else [])))(monthly, limit_info),
+                           selected_biologics_summary=selected_biologics_summary,
+                           selected_existing_summary=selected_existing_summary,
+                           selected_biologic=selected_biologic,
+                           existing_treatments=existing_treatments,
                            year1=year1,
                            year2=year2,
                            )

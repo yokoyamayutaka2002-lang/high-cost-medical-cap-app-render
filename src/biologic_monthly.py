@@ -121,55 +121,79 @@ def integrate_biologic_monthly(
 
 
 def apply_monthly_subsidy_to_monthly_map(monthly_map: Dict[str, Dict[str, Any]], subsidy_cap: int | None) -> Dict[str, Dict[str, Any]]:
-    """Apply monthly subsidy cap across biologic events in-place.
+    """Apply monthly subsidy cap and produce canonical per-event and per-month fields.
 
-    Algorithm (per spec):
-    1) monthly_after_kougaku[YYYY-MM] = sum(event.after_kougaku)  # here event.after_kougaku == ev['actual_payment']
-    2) monthly_after_subsidy = min(monthly_after_kougaku, subsidy_cap)
-    3) Distribute monthly_after_subsidy back to events proportionally to event.after_kougaku
+    This function enforces the Single Source of Truth (SSOT) requirement:
+    - Each month in `monthly_map[ym]['post_subsidy_self_pay']` is the canonical
+      monthly post-subsidy total used by downstream logic.
+    - Each event is annotated with `self_pay` (int) and `post_subsidy_payment` (int).
+
+    Algorithm (strict spec):
+    1) Ensure every event has `self_pay` (int). If absent, derive from `actual_payment`.
+    2) month_total_self_pay = sum(event['self_pay'])
+    3) post_subsidy_self_pay = min(month_total_self_pay, subsidy_cap) if subsidy_cap is not None else month_total_self_pay
+    4) subsidy_amount = max(0, month_total_self_pay - post_subsidy_self_pay)
+    5) Distribute `subsidy_amount` proportionally to each event's `self_pay` to compute
+       the per-event reduction; set event['post_subsidy_payment'] = self_pay - alloc.
+       Use integer arithmetic and put any rounding remainder onto the last event.
+    6) Assert that sum(event['post_subsidy_payment']) == post_subsidy_self_pay and raise on mismatch.
 
     - monthly_map: map of YYYY-MM -> { 'events': [ { 'actual_payment': int, ... }, ... ], ... }
     - subsidy_cap: monthly cap (int) or None to skip subsidy
 
-    Returns the same monthly_map with each event annotated with 'final_pay' and
-    each month annotated with 'post_subsidy_self_pay'.
+    Returns the same monthly_map with each event annotated and each month annotated
+    with 'post_subsidy_self_pay'. Raises AssertionError on any allocation mismatch.
     """
     for ym, bucket in monthly_map.items():
         evs = bucket.get('events') or []
-        # sum of per-event amounts after high-cost cap (after_kougaku)
-        try:
-            total_after_kougaku = sum(int(ev.get('actual_payment') or 0) for ev in evs)
-        except Exception:
-            total_after_kougaku = 0
 
+        # 1) Ensure canonical `self_pay` on each event
+        for ev in evs:
+            if 'self_pay' in ev and ev['self_pay'] is not None:
+                # preserve provided value but ensure it's an int (fail fast on bad data)
+                ev['self_pay'] = int(ev['self_pay'])
+            else:
+                ev['self_pay'] = int(ev.get('actual_payment') or 0)
+
+        # 2) month total
+        month_total_self_pay = int(sum(int(ev.get('self_pay') or 0) for ev in evs))
+
+        # 3) compute post_subsidy_self_pay (SSOT monthly value)
         if subsidy_cap is not None:
-            try:
-                monthly_after_subsidy = min(int(total_after_kougaku), int(subsidy_cap))
-            except Exception:
-                monthly_after_subsidy = int(total_after_kougaku)
+            post_subsidy = int(min(month_total_self_pay, int(subsidy_cap)))
         else:
-            monthly_after_subsidy = int(total_after_kougaku)
+            post_subsidy = int(month_total_self_pay)
 
-        # store the monthly-level post-subsidy total (used by aggregates)
-        bucket['post_subsidy_self_pay'] = int(monthly_after_subsidy)
+        bucket['post_subsidy_self_pay'] = int(post_subsidy)
 
-        # distribute proportionally; preserve zeros and ensure integer sum matches monthly_after_subsidy
+        # 4) subsidy amount (amount reduced from patient responsibility)
+        subsidy_amount = int(max(0, month_total_self_pay - post_subsidy))
+
+        # 5) per-event distribution
         if not evs:
+            # nothing to do
             continue
-        if total_after_kougaku > 0:
-            assigned = 0
-            for i, ev in enumerate(evs):
-                pre = int(ev.get('actual_payment') or 0)
-                if i < len(evs) - 1:
-                    # rounding per-event; last event receives remainder
-                    share = int(round((pre / float(total_after_kougaku)) * monthly_after_subsidy)) if total_after_kougaku > 0 else 0
-                    ev['final_pay'] = max(0, int(share))
-                    assigned += int(ev['final_pay'])
-                else:
-                    ev['final_pay'] = max(0, int(monthly_after_subsidy) - assigned)
-        else:
-            # no pre-subsidy amounts -> zero out final_pay
+
+        if subsidy_amount == 0 or month_total_self_pay == 0:
             for ev in evs:
-                ev['final_pay'] = 0
+                ev['post_subsidy_payment'] = int(ev.get('self_pay') or 0)
+        else:
+            allocated = 0
+            for idx, ev in enumerate(evs):
+                sp = int(ev.get('self_pay') or 0)
+                if idx < len(evs) - 1:
+                    # proportional share of the total reduction
+                    alloc = int(round((sp * subsidy_amount) / float(month_total_self_pay))) if month_total_self_pay > 0 else 0
+                    allocated += int(alloc)
+                else:
+                    alloc = int(subsidy_amount - allocated)
+                post = int(max(0, sp - int(alloc)))
+                ev['post_subsidy_payment'] = post
+
+        # 6) assert sums match SSOT
+        sum_after = int(sum(int(e.get('post_subsidy_payment') or 0) for e in evs))
+        expected = int(bucket.get('post_subsidy_self_pay') or 0)
+        if sum_after != expected:
+            raise AssertionError(f"SUBSIDY ALLOCATION MISMATCH for {ym}: sum_after={sum_after} expected(post_subsidy_self_pay)={expected}")
 
     return monthly_map

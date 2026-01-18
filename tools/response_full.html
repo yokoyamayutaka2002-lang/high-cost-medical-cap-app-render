@@ -180,8 +180,6 @@
     }
 
     /* 優先順位メモ（差額 > 控除 > 給付 > 元費用） - ensure rules above are applied in that order */
-    /* Ensure result header isn't hidden behind fixed headers when scrolled to */
-    #result-section { scroll-margin-top: 80px; }
   </style>
   <style>
     /* (card-style input-summary removed per UI change) */
@@ -203,16 +201,34 @@
     <fieldset class="card">
       <legend>生物学的製剤</legend>
       <label>薬剤: <select id="drug_id" name="drug_id">
-        {# Render all non-xolair entries first #}
-        {% for d in drugs %}
-          {% if not (d.drug_id and d.drug_id.startswith('xolair_')) %}
-            <option value="{{ d.drug_id }}" {% if d.drug_id==selected_drug %}selected{% endif %}>{{ d.drug_id }} - {{ d.get('drug_name') or d.drug_id }}</option>
-          {% endif %}
-        {% endfor %}
-        {# If any xolair_* entries exist, present a single unified 'xolair' choice. #}
-        {% if has_xolair %}
-          <option value="xolair" {% if selected_drug and ('xolair' in selected_drug) %}selected{% endif %}>xolair - ゾレア（IgE/体重で投与量が決まります）</option>
-        {% endif %}
+        
+        
+          
+            <option value="dupixent_300" selected>dupixent_300 - デュピクセント皮下注300mgペン</option>
+          
+        
+          
+            <option value="tezspire" >tezspire - テゼスパイア皮下注210mgペン</option>
+          
+        
+          
+            <option value="nucala" >nucala - ヌーカラ皮下注100mgペン</option>
+          
+        
+          
+            <option value="fasenra" >fasenra - ファセンラ皮下注30mgペン</option>
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+          <option value="xolair" >xolair - ゾレア（IgE/体重で投与量が決まります）</option>
+        
       </select></label>
       <div id="xolair_panel" style="display:none;margin-top:8px">
         <label>Xolair 用 IgE (IU/mL): <input id="xolair_ige" name="xolair_ige" type="number" min="0" step="1"/></label>
@@ -220,25 +236,29 @@
         <div id="xolair_display" class="muted" style="margin-top:6px">Xolair: -</div>
       </div>
       <br>
-      <label>開始日: <input id="start_date" type="date" name="start_date" value="{{ start_date or '' }}"/></label>
+      <label>開始日: <input id="start_date" type="date" name="start_date" value="2025-01-01"/></label>
       <br>
-      <label>{% if selected_drug and ('xolair' in selected_drug) %}2回目処方 回分:{% else %}2回目処方 本数:{% endif %} <input id="qty2" type="number" name="qty2" min="1" value="{{ qty2 or '' }}"/></label>
+      <label>2回目処方 本数: <input id="qty2" type="number" name="qty2" min="1" value="1"/></label>
       <br>
-      <label>{% if selected_drug and ('xolair' in selected_drug) %}3回目処方 回分:{% else %}3回目処方 本数:{% endif %} <input id="qty3" type="number" name="qty3" min="1" value="{{ qty3 or '' }}"/></label>
+      <label>3回目処方 本数: <input id="qty3" type="number" name="qty3" min="1" value="1"/></label>
       <br>
       <!-- 投与間隔（週）: UIから削除しました -->
       <label>制度: 
         <select name="system_version" id="system_version">
-          {% for sv in system_versions %}
-          <option value="{{ sv }}" {% if sv==selected_system %}selected{% endif %}>{{ sv }}</option>
-          {% endfor %}
+          
+          <option value="R7" >R7</option>
+          
+          <option value="R8" >R8</option>
+          
+          <option value="R9" selected>R9</option>
+          
         </select>
       </label>
       <br>
       <label>年齢区分:
         <select name="age_group" id="age_group">
-          <option value="under70" {% if selected_age_group=='under70' %}selected{% endif %}>70歳未満</option>
-          <option value="over70" {% if selected_age_group=='over70' %}selected{% endif %}>70歳以上</option>
+          <option value="under70" selected>70歳未満</option>
+          <option value="over70" >70歳以上</option>
         </select>
       </label>
       <br>
@@ -256,14 +276,14 @@
         </select>
       </label>
       <br>
-      <label><input type="checkbox" id="use_medical_deduction" name="use_medical_deduction" {% if request.form.get('use_medical_deduction') %}checked{% endif %}/> 医療費控除を利用</label>
+      <label><input type="checkbox" id="use_medical_deduction" name="use_medical_deduction" checked/> 医療費控除を利用</label>
       <div id="taxable_income_field" style="display:none;margin-top:6px">
-        <label>課税所得（円）: <input id="taxable_income" name="taxable_income" type="number" min="0" step="1000" value="{{ request.form.get('taxable_income','') }}"/></label>
+        <label>課税所得（円）: <input id="taxable_income" name="taxable_income" type="number" min="0" step="1000" value=""/></label>
       </div>
       <br>
-      <label style="display:inline-block"> <input type="checkbox" name="use_subsidy" id="use_subsidy" {% if request.form.get('use_subsidy') %}checked{% endif %}/> 付加給付制度を利用</label>
+      <label style="display:inline-block"> <input type="checkbox" name="use_subsidy" id="use_subsidy" checked/> 付加給付制度を利用</label>
       <div id="subsidy_field" style="display:none; margin-top:6px">
-        <label>月額（円）: <input type="number" name="subsidy_cap" id="subsidy_cap" value="{{ request.form.get('subsidy_cap') or '' }}" style="width:140px; box-sizing:border-box; margin-left:6px"/></label>
+        <label>月額（円）: <input type="number" name="subsidy_cap" id="subsidy_cap" value="20000" style="width:140px; box-sizing:border-box; margin-left:6px"/></label>
       </div>
     </fieldset>
 
@@ -283,121 +303,130 @@
       <input type="hidden" name="existing_mode" value="csv" />
 
       <div style="margin-top:8px; text-align:left">
-        {% if controllers and controllers|length > 0 %}
+        
         <label class="section-label">吸入薬を選択</label>
         <select name="primary_drug_ids" id="primary_drug_select" multiple size="6" style="display:block; width:100%; margin-bottom:8px; text-align:left">
           <optgroup label="ICS/LABA/LAMA - 指定グループ">
-            {% for d in controllers if d.group == 'TRIPLE' %}
-              {% set label = d.display_name or d.drug_id %}
-              <option value="{{ d.drug_id }}" data-class="{{ d.class|e }}" data-weekly="{{ d.weekly_price }}" {% if d.drug_id in (selected_primary_ids or []) %}selected{% endif %}>{{ label }}{% if d.strength %} {{ d.strength }}{% endif %}（週 {{ d.weekly_price }} 円）</option>
-            {% endfor %}
+            
+              
+              <option value="エナジア吸入用カプセル高用量" data-class="Triple" data-weekly="696" >エナジア吸入用カプセル高用量（週 696 円）</option>
+            
+              
+              <option value="エナジア吸入用カプセル中用量" data-class="Triple" data-weekly="610" >エナジア吸入用カプセル中用量（週 610 円）</option>
+            
+              
+              <option value="テリルジー200エリプタ30吸入用" data-class="Triple" data-weekly="677" >テリルジー200エリプタ30吸入用（週 677 円）</option>
+            
+              
+              <option value="テリルジー100エリプタ30吸入用" data-class="Triple" data-weekly="595" >テリルジー100エリプタ30吸入用（週 595 円）</option>
+            
           </optgroup>
 
           <optgroup label="ICS/LABA - それ以外（LAMA除く）">
-            {% for d in controllers if d.group == 'ICS_LABA' %}
-              {% set label = d.display_name or d.drug_id %}
-              <option value="{{ d.drug_id }}" data-class="{{ d.class|e }}" data-weekly="{{ d.weekly_price }}" {% if d.drug_id in (selected_primary_ids or []) %}selected{% endif %}>{{ label }}{% if d.strength %} {{ d.strength }}{% endif %}（週 {{ d.weekly_price }} 円）</option>
-            {% endfor %}
+            
+              
+              <option value="アテキュラ吸入用カプセル高用量" data-class="ICS/LABA" data-weekly="339" >アテキュラ吸入用カプセル高用量（週 339 円）</option>
+            
+              
+              <option value="アテキュラ吸入用カプセル中用量" data-class="ICS/LABA" data-weekly="304" >アテキュラ吸入用カプセル中用量（週 304 円）</option>
+            
+              
+              <option value="アテキュラ吸入用カプセル低用量" data-class="ICS/LABA" data-weekly="278" >アテキュラ吸入用カプセル低用量（週 278 円）</option>
+            
+              
+              <option value="フルティフォーム125エアゾール120吸入用(1日8吸入)" data-class="ICS/LABA" data-weekly="608" >フルティフォーム125エアゾール120吸入用(1日8吸入)（週 608 円）</option>
+            
+              
+              <option value="フルティフォーム125エアゾール120吸入用(1日6吸入)" data-class="ICS/LABA" data-weekly="456" >フルティフォーム125エアゾール120吸入用(1日6吸入)（週 456 円）</option>
+            
+              
+              <option value="フルティフォーム125エアゾール120吸入用(1日4吸入)" data-class="ICS/LABA" data-weekly="304" >フルティフォーム125エアゾール120吸入用(1日4吸入)（週 304 円）</option>
+            
+              
+              <option value="フルティフォーム50エアゾール120吸入用" data-class="ICS/LABA" data-weekly="292" >フルティフォーム50エアゾール120吸入用（週 292 円）</option>
+            
+              
+              <option value="ブデホル吸入粉末剤60吸入(1日8吸入)" data-class="ICS/LABA" data-weekly="342" >ブデホル吸入粉末剤60吸入(1日8吸入)（週 342 円）</option>
+            
+              
+              <option value="ブデホル吸入粉末剤60吸入(1日4吸入)" data-class="ICS/LABA" data-weekly="171" >ブデホル吸入粉末剤60吸入(1日4吸入)（週 171 円）</option>
+            
+              
+              <option value="ブデホル吸入粉末剤60吸入(1日6吸入)" data-class="ICS/LABA" data-weekly="257" >ブデホル吸入粉末剤60吸入(1日6吸入)（週 257 円）</option>
+            
+              
+              <option value="レルベア200エリプタ30吸入用" data-class="ICS/LABA" data-weekly="365" >レルベア200エリプタ30吸入用（週 365 円）</option>
+            
+              
+              <option value="レルベア100エリプタ30吸入用" data-class="ICS/LABA" data-weekly="338" >レルベア100エリプタ30吸入用（週 338 円）</option>
+            
           </optgroup>
         </select>
 
         <label class="section-label">LAMAを選択</label>
         <select name="lama_drug_id" id="lama_drug_select" style="display:block; width:100%; margin-bottom:8px; text-align:left">
           <option value="">-- 選択しない --</option>
-          {% for d in lamas %}
-          <option value="{{ d.drug_id }}" data-class="{{ d.class|e }}" data-weekly="{{ d.weekly_price }}" {% if d.drug_id==selected_lama_id %}selected{% endif %}>{% if d.display_name %}{{ d.display_name }}{% else %}{{ d.drug_id }}{% endif %}{% if d.strength %} {{ d.strength }}{% endif %}（週 {{ d.weekly_price }} 円）</option>
-          {% endfor %}
+          
+          <option value="スピリーバ2.5μgレスピマット60吸入" data-class="LAMA" data-weekly="217" >スピリーバ2.5μgレスピマット60吸入（週 217 円）</option>
+          
         </select>
 
         <label class="section-label">内服薬を選択</label>
         <div id="oral_drug_list" style="max-height:200px;overflow:auto;border:1px solid #eee;padding:6px; text-align:left">
-          {% for o in oral_drugs %}
+          
           <div style="margin-bottom:4px">
-            <label style="white-space:nowrap"><input type="checkbox" name="oral_drug_ids" value="{{ o.drug_id }}" data-weekly="{{ o.weekly_price }}" {% if o.drug_id in (selected_oral_ids or []) %}checked{% endif %}/> {% if o.display_name %}{{ o.display_name }}{% else %}{{ o.drug_id }}{% endif %}{% if o.strength %} {{ o.strength }}{% endif %}（週 {{ o.weekly_price }} 円）</label>
+            <label style="white-space:nowrap"><input type="checkbox" name="oral_drug_ids" value="テオフィリン１００ｍｇ徐放Ｕ錠|100" data-weekly="41" /> テオフィリン１００ｍｇ徐放Ｕ錠 100（週 41 円）</label>
           </div>
-          {% endfor %}
+          
+          <div style="margin-bottom:4px">
+            <label style="white-space:nowrap"><input type="checkbox" name="oral_drug_ids" value="テオフィリン２００ｍｇ徐放Ｕ錠|200" data-weekly="43" /> テオフィリン２００ｍｇ徐放Ｕ錠 200（週 43 円）</label>
+          </div>
+          
+          <div style="margin-bottom:4px">
+            <label style="white-space:nowrap"><input type="checkbox" name="oral_drug_ids" value="テオフィリン４００ｍｇ徐放Ｕ錠|400" data-weekly="43" /> テオフィリン４００ｍｇ徐放Ｕ錠 400（週 43 円）</label>
+          </div>
+          
+          <div style="margin-bottom:4px">
+            <label style="white-space:nowrap"><input type="checkbox" name="oral_drug_ids" value="プランルカスト錠２２５ｍｇ|225" data-weekly="342" /> プランルカスト錠２２５ｍｇ 225（週 342 円）</label>
+          </div>
+          
+          <div style="margin-bottom:4px">
+            <label style="white-space:nowrap"><input type="checkbox" name="oral_drug_ids" value="モンテルカスト錠１０ｍｇ|10" data-weekly="97" /> モンテルカスト錠１０ｍｇ 10（週 97 円）</label>
+          </div>
+          
+          <div style="margin-bottom:4px">
+            <label style="white-space:nowrap"><input type="checkbox" name="oral_drug_ids" value="モンテルカスト錠５ｍｇ|5" data-weekly="127" /> モンテルカスト錠５ｍｇ 5（週 127 円）</label>
+          </div>
+          
         </div>
         <div class="muted">既存治療 合計週額: <span id="oral_weekly_sum">0</span> 円</div>
         <span id="lama_helper" class="muted" style="margin-left:8px;display:none">※Triple 選択時は LAMA を併用できません</span>
-        {% else %}
-          <label style="display:block; text-align:left">既存治療薬を選択（複数可）:
-            <select name="existing_drug_ids" id="existing_old_select" multiple size="6" style="display:block; width:100%; text-align:left">
-              {% for e in existing_drugs %}
-              <option value="{{ e.drug_id }}" data-weekly="{{ e.weekly_cost_yen }}" {% if e.drug_id in (selected_existing_drug_ids or []) %}selected{% endif %}>{{ e.drug_name }}（週 {{ e.weekly_cost_yen }} 円）</option>
-              {% endfor %}
-            </select>
-          </label>
-        {% endif %}
+        
       </div>
     </fieldset>
 
     <div style="margin-top:12px"><button type="submit">計算実行</button></div>
   </form>
 
-  {% if error_message %}
-  <div class="card highlight"> <strong>エラー:</strong> {{ error_message }} </div>
-  {% endif %}
-
-  {% if results %}
-  <h2 id="result-section">結果</h2>
-  <div class="calc-summary">
-    <p><strong>開始日：</strong>{{ start_date or '—' }}</p>
-    <p><strong>制度：</strong>{{ system or selected_system or '' }}</p>
-    <p><strong>年齢区分：</strong>{{ age_label or (age_group or selected_age_group) }}</p>
-    <p><strong>所得区分：</strong>{{ income_display or income_class or selected_income_category or '' }}</p>
-    <p><strong>自己負担割合：</strong>{{ copay_rate_percent }}％</p>
-    {% if medical_deduction_enabled %}
-    <p><strong>課税所得：</strong>{{ taxable_income }}円</p>
-    {% endif %}
-    {% if benefit_enabled %}
-    <p><strong>付加給付制度：</strong>月額 {{ benefit_monthly or 0 }} 円</p>
-    {% endif %}
-    {% if high_cost_applicable is defined %}
-      {% if high_cost_applicable %}
-        <div>
-          <strong>高額療養費適用：</strong>
-          <strong>可</strong>
-        </div>
-      {% else %}
-        <div>
-          <strong>高額療養費適用：</strong>
-          <strong class="text-danger">不可</strong>
-        </div>
-      {% endif %}
-    {% endif %}
   
-  {% if selected_biologic or existing_treatments %}
-  <hr>
-  <div style="margin-top:12px">
-    <strong>治療内容</strong>
 
-    {% if selected_biologic %}
-    <div style="margin-top:6px">
-      <strong>生物学的製剤：</strong>
-      <ul style="margin:6px 0 0 1em;padding-left:1.2em;list-style:disc">
-        <li>{{ selected_biologic.display_name }}{% if selected_biologic.dose or selected_biologic.interval %}（{% if selected_biologic.dose %}{{ selected_biologic.dose }}{% endif %}{% if selected_biologic.dose and selected_biologic.interval %}・{% endif %}{% if selected_biologic.interval %}{{ selected_biologic.interval }}{% endif %}）{% endif %}</li>
-      </ul>
-    </div>
-    {% endif %}
-
-    {% if existing_treatments %}
-    <div style="margin-top:6px">
-      <strong>既存治療：</strong>
-      <ul style="margin:6px 0 0 1em;padding-left:1.2em;list-style:disc">
-        {% for drug in existing_treatments %}
-          <li>
-            {{ drug.display_name }}
-            {% if drug.weekly_cost_yen is not none %}
-              （週あたり {{ drug.weekly_cost_yen | yen }}）
-            {% endif %}
-          </li>
-        {% endfor %}
-      </ul>
-    </div>
-    {% endif %}
+  
+  <h2>結果</h2>
+  <div class="calc-summary">
+    <p><strong>開始日：</strong>2025-01-01</p>
+    <p><strong>制度：</strong>R9</p>
+    <p><strong>年齢区分：</strong>70歳未満</p>
+    <p><strong>所得区分：</strong>R9_370_510</p>
+    <p><strong>自己負担割合：</strong>0％</p>
+    
+    <p><strong>課税所得：</strong>0円</p>
+    
+    
+    <p><strong>付加給付制度：</strong>月額 20000 円</p>
+    
   </div>
-  {% endif %}
-
+  
+  
   <!-- Compact two-year comparison table requested -->
   <div class="card" style="margin-bottom:12px">
     <div class="table-responsive">
@@ -419,61 +448,59 @@
           </tr>
         </thead>
         <tbody>
-          <tr class="base-row"><th style="text-align:left">既存治療</th><td>{{ year1.base | yen }}</td><td>{{ ((year1.base / 12) | round(0) | int) | yen }}</td><td>{{ year2.base | yen }}</td><td>{{ ((year2.base / 12) | round(0) | int) | yen }}</td></tr>
-          <tr class="base-row"><th style="text-align:left">生物学的製剤</th><td>{{ year1.bio | yen }}</td><td>{{ ((year1.bio / 12) | round(0) | int) | yen }}</td><td>{{ year2.bio | yen }}</td><td>{{ ((year2.bio / 12) | round(0) | int) | yen }}</td></tr>
-          <tr class="diff-row"><th style="text-align:left">差額（生物学的製剤）</th><td>{{ year1.diff | yen }}</td><td>{{ ((year1.diff / 12) | round(0) | int) | yen }}</td><td>{{ year2.diff | yen }}</td><td>{{ ((year2.diff / 12) | round(0) | int) | yen }}</td></tr>
-          {% if benefit_enabled %}
-          <tr class="benefit-row"><th style="text-align:left">付加給付あり</th><td>{{ year1.after_benefit | yen }}</td><td>{{ ((year1.after_benefit / 12) | round(0) | int) | yen }}</td><td>{{ year2.after_benefit | yen }}</td><td>{{ ((year2.after_benefit / 12) | round(0) | int) | yen }}</td></tr>
-          <tr class="diff-row"><th style="text-align:left">差額（付加給付）</th><td>{{ year1.diff_after_benefit | yen }}</td><td>{{ ((year1.diff_after_benefit / 12) | round(0) | int) | yen }}</td><td>{{ year2.diff_after_benefit | yen }}</td><td>{{ ((year2.diff_after_benefit / 12) | round(0) | int) | yen }}</td></tr>
-          {% endif %}
-          {% if medical_deduction_enabled %}
+          <tr class="base-row"><th style="text-align:left">既存治療</th><td>¥43,472</td><td>¥3,623</td><td>¥43,472</td><td>¥3,623</td></tr>
+          <tr class="base-row"><th style="text-align:left">生物学的製剤</th><td>¥368,263</td><td>¥30,689</td><td>¥265,472</td><td>¥22,123</td></tr>
+          <tr class="diff-row"><th style="text-align:left">差額（生物学的製剤）</th><td>¥324,791</td><td>¥27,066</td><td>¥222,000</td><td>¥18,500</td></tr>
+          
+          <tr class="benefit-row"><th style="text-align:left">付加給付あり</th><td>¥150,000</td><td>¥12,500</td><td>¥150,000</td><td>¥12,500</td></tr>
+          <tr class="diff-row"><th style="text-align:left">差額（付加給付）</th><td>¥106,528</td><td>¥8,877</td><td>¥106,528</td><td>¥8,877</td></tr>
+          
+          
           <tr class="group-deduction deduction-row"><th style="text-align:left">医療費控除還付</th>
-            <td>{{ (period_aggregates.calendar_start.medical_tax_refund_total | default(0)) | yen }}</td>
-            <td>{{ (period_aggregates.calendar_start.medical_tax_refund_total_monthly | default(0)) | yen }}</td>
-            <td>{{ (period_aggregates.calendar_next.medical_tax_refund_total | default(0)) | yen }}</td>
-            <td>{{ (period_aggregates.calendar_next.medical_tax_refund_total_monthly | default(0)) | yen }}</td>
+            <td>¥7,500</td>
+            <td>¥625</td>
+            <td>¥7,500</td>
+            <td>¥625</td>
           </tr>
           <tr class="group-deduction deduction-row"><th style="text-align:left; padding-left:2em">所得税</th>
-            <td>{{ (period_aggregates.calendar_start.medical_tax_refund_income | default(0)) | yen }}</td>
-            <td>{{ (period_aggregates.calendar_start.medical_tax_refund_income_monthly | default(0)) | yen }}</td>
-            <td>{{ (period_aggregates.calendar_next.medical_tax_refund_income | default(0)) | yen }}</td>
-            <td>{{ (period_aggregates.calendar_next.medical_tax_refund_income_monthly | default(0)) | yen }}</td>
+            <td>¥2,500</td>
+            <td>¥208</td>
+            <td>¥2,500</td>
+            <td>¥208</td>
           </tr>
           <tr class="group-deduction deduction-row"><th style="text-align:left; padding-left:2em">住民税</th>
-            <td>{{ (period_aggregates.calendar_start.medical_tax_refund_resident | default(0)) | yen }}</td>
-            <td>{{ (period_aggregates.calendar_start.medical_tax_refund_resident_monthly | default(0)) | yen }}</td>
-            <td>{{ (period_aggregates.calendar_next.medical_tax_refund_resident | default(0)) | yen }}</td>
-            <td>{{ (period_aggregates.calendar_next.medical_tax_refund_resident_monthly | default(0)) | yen }}</td>
+            <td>¥5,000</td>
+            <td>¥417</td>
+            <td>¥5,000</td>
+            <td>¥417</td>
           </tr>
           <tr class="group-final deduction-row"><th style="text-align:left">医療費控除還付後</th>
-            <td>{{ (period_aggregates.calendar_start.after_medical_annual_self_pay | default(0)) | yen }}</td>
-            <td>{{ (period_aggregates.calendar_start.after_medical_monthly_self_pay | default(0)) | yen }}</td>
-            <td>{{ (period_aggregates.calendar_next.after_medical_annual_self_pay | default(0)) | yen }}</td>
-            <td>{{ (period_aggregates.calendar_next.after_medical_monthly_self_pay | default(0)) | yen }}</td>
+            <td>¥142,500</td>
+            <td>¥11,875</td>
+            <td>¥142,500</td>
+            <td>¥11,875</td>
           </tr>
           <tr class="diff-row"><th style="text-align:left">差額（医療費控除）</th>
-            <td>{{ (period_aggregates.calendar_start.difference_after_medical | default(0)) | yen }}</td>
-            <td>{{ ((period_aggregates.calendar_start.difference_after_medical | default(0)) / 12) | round(0) | int | yen }}</td>
-            <td>{{ (period_aggregates.calendar_next.difference_after_medical | default(0)) | yen }}</td>
-            <td>{{ ((period_aggregates.calendar_next.difference_after_medical | default(0)) / 12) | round(0) | int | yen }}</td>
+            <td>¥99,028</td>
+            <td>¥8,252</td>
+            <td>¥99,028</td>
+            <td>¥8,252</td>
           </tr>
-          {% endif %}
+          
         </tbody>
       </table>
     </div>
   </div>
-  {% if results %}
-  {% endif %}
   
   
-  {# 月別内訳: UI上の表示は不要になったため省略 #}
-  {% endif %}
+  
+  
+  
+  
 
-  {% if prescription_schedule %}
+  
   <h3>処方スケジュール</h3>
-  {% if xolair_display %}
-  <div style="margin:6px 0 10px 0; font-weight:600">{{ xolair_display }}</div>
-  {% endif %}
+  
   <div class="card">
     <div class="table-responsive">
       <table>
@@ -481,37 +508,191 @@
         <tr>
           <th>回</th>
           <th>処方日</th>
-          <th>{% if selected_drug and ('xolair' in selected_drug) %}処方単位{% else %}本数{% endif %}</th>
+          <th>本数</th>
           <th>投与期間</th>
           <th>調整前金額</th>
           <th>自己負担金額</th>
-          {% if benefit_enabled %}
+          
           <th>付加給付調整後</th>
-          {% endif %}
+          
         </tr>
       </thead>
       <tbody>
-        {% set dpu = days_per_unit or 0 %}
-        {% for ev in prescription_schedule %}
-        {% set days = ev.get('days') if ev.get('days') is not none else (ev.qty * dpu) %}
-        {% set weeks = (days // 7) if days else 0 %}
+        
+        
+        
+        
         <tr>
-          <td style="text-align:center">{{ ev.order }}</td>
-          <td style="text-align:left">{{ ev.date }}</td>
-          <td style="text-align:center">{{ ev.qty }} {% if selected_drug and ('xolair' in selected_drug) %}回分{% else %}本{% endif %}</td>
-          <td style="text-align:right">{{ days }}日 ({{ weeks }}週)</td>
-          <td style="text-align:right">{% if ev.get('raw_self') is not none %}¥{{ ev.get('raw_self') }}{% else %}—{% endif %}</td>
-          <td style="text-align:right">{% if ev.get('actual_payment') is not none %}¥{{ ev.get('actual_payment') }}{% else %}—{% endif %}</td>
-          {% if benefit_enabled %}
-          <td style="text-align:right">{% if ev.get('post_subsidy_payment') is not none %}¥{{ ev.get('post_subsidy_payment') }}{% else %}—{% endif %}</td>
-          {% endif %}
+          <td style="text-align:center">1</td>
+          <td style="text-align:left">2025-01-01</td>
+          <td style="text-align:center">2 本</td>
+          <td style="text-align:right">14日 (2週)</td>
+          <td style="text-align:right">¥32195</td>
+          <td style="text-align:right">¥32195</td>
+          
+          <td style="text-align:right">—</td>
+          
         </tr>
-        {% endfor %}
+        
+        
+        
+        <tr>
+          <td style="text-align:center">2</td>
+          <td style="text-align:left">2025-01-15</td>
+          <td style="text-align:center">1 本</td>
+          <td style="text-align:right">14日 (2週)</td>
+          <td style="text-align:right">¥16098</td>
+          <td style="text-align:right">¥16098</td>
+          
+          <td style="text-align:right">—</td>
+          
+        </tr>
+        
+        
+        
+        <tr>
+          <td style="text-align:center">3</td>
+          <td style="text-align:left">2025-01-29</td>
+          <td style="text-align:center">1 本</td>
+          <td style="text-align:right">14日 (2週)</td>
+          <td style="text-align:right">¥16098</td>
+          <td style="text-align:right">¥16098</td>
+          
+          <td style="text-align:right">—</td>
+          
+        </tr>
+        
+        
+        
+        <tr>
+          <td style="text-align:center">4</td>
+          <td style="text-align:left">2025-02-12</td>
+          <td style="text-align:center">6 本</td>
+          <td style="text-align:right">84日 (12週)</td>
+          <td style="text-align:right">¥96586</td>
+          <td style="text-align:right">¥85800</td>
+          
+          <td style="text-align:right">—</td>
+          
+        </tr>
+        
+        
+        
+        <tr>
+          <td style="text-align:center">5</td>
+          <td style="text-align:left">2025-05-07</td>
+          <td style="text-align:center">6 本</td>
+          <td style="text-align:right">84日 (12週)</td>
+          <td style="text-align:right">¥96586</td>
+          <td style="text-align:right">¥85800</td>
+          
+          <td style="text-align:right">—</td>
+          
+        </tr>
+        
+        
+        
+        <tr>
+          <td style="text-align:center">6</td>
+          <td style="text-align:left">2025-07-30</td>
+          <td style="text-align:center">6 本</td>
+          <td style="text-align:right">84日 (12週)</td>
+          <td style="text-align:right">¥96586</td>
+          <td style="text-align:right">¥44400</td>
+          
+          <td style="text-align:right">—</td>
+          
+        </tr>
+        
+        
+        
+        <tr>
+          <td style="text-align:center">7</td>
+          <td style="text-align:left">2025-10-22</td>
+          <td style="text-align:center">6 本</td>
+          <td style="text-align:right">84日 (12週)</td>
+          <td style="text-align:right">¥96586</td>
+          <td style="text-align:right">¥44400</td>
+          
+          <td style="text-align:right">—</td>
+          
+        </tr>
+        
+        
+        
+        <tr>
+          <td style="text-align:center">8</td>
+          <td style="text-align:left">2026-01-14</td>
+          <td style="text-align:center">6 本</td>
+          <td style="text-align:right">84日 (12週)</td>
+          <td style="text-align:right">¥96586</td>
+          <td style="text-align:right">¥44400</td>
+          
+          <td style="text-align:right">—</td>
+          
+        </tr>
+        
+        
+        
+        <tr>
+          <td style="text-align:center">9</td>
+          <td style="text-align:left">2026-04-08</td>
+          <td style="text-align:center">6 本</td>
+          <td style="text-align:right">84日 (12週)</td>
+          <td style="text-align:right">¥96586</td>
+          <td style="text-align:right">¥44400</td>
+          
+          <td style="text-align:right">—</td>
+          
+        </tr>
+        
+        
+        
+        <tr>
+          <td style="text-align:center">10</td>
+          <td style="text-align:left">2026-07-01</td>
+          <td style="text-align:center">6 本</td>
+          <td style="text-align:right">84日 (12週)</td>
+          <td style="text-align:right">¥96586</td>
+          <td style="text-align:right">¥44400</td>
+          
+          <td style="text-align:right">—</td>
+          
+        </tr>
+        
+        
+        
+        <tr>
+          <td style="text-align:center">11</td>
+          <td style="text-align:left">2026-09-23</td>
+          <td style="text-align:center">6 本</td>
+          <td style="text-align:right">84日 (12週)</td>
+          <td style="text-align:right">¥96586</td>
+          <td style="text-align:right">¥44400</td>
+          
+          <td style="text-align:right">—</td>
+          
+        </tr>
+        
+        
+        
+        <tr>
+          <td style="text-align:center">12</td>
+          <td style="text-align:left">2026-12-16</td>
+          <td style="text-align:center">6 本</td>
+          <td style="text-align:right">84日 (12週)</td>
+          <td style="text-align:right">¥96586</td>
+          <td style="text-align:right">¥44400</td>
+          
+          <td style="text-align:right">—</td>
+          
+        </tr>
+        
       </tbody>
       </table>
     </div>
   </div>
-  {% endif %}
+  
 
 <script>
 function toggleMode(v){
@@ -714,9 +895,9 @@ document.addEventListener('DOMContentLoaded', function(){
 </script>
 <script>
 // income_map is provided by server as JSON-compatible object
-const INCOME_MAP = {{ income_map | tojson | safe }} || {};
+const INCOME_MAP = {"R7": {"over70": [["A", "\u73fe\u5f79\u4e26\u307f\u2162\uff08\u5e74\u53ce\u7d041,160\u4e07\u5186\u4ee5\u4e0a\uff09"], ["I", "\u73fe\u5f79\u4e26\u307f\u2161\uff08\u5e74\u53ce\u7d04770\u4e07\u5186\uff5e1,160\u4e07\u5186\uff09"], ["U", "\u73fe\u5f79\u4e26\u307f\u2160\uff08\u5e74\u53ce\u7d04370\u4e07\u5186\uff5e770\u4e07\u5186\uff09"], ["E", "\u4e00\u822c\uff08\u5e74\u53ce156\u4e07\uff5e\u7d04370\u4e07\u5186\uff09"], ["LI2", "\u4f4e\u6240\u5f97\u8005\u2161\uff08\u4f4f\u6c11\u7a0e\u975e\u8ab2\u7a0e\u4e16\u5e2f\uff09"], ["LI1", "\u4f4e\u6240\u5f97\u8005\u2160\uff08\u4f4f\u6c11\u7a0e\u975e\u8ab2\u7a0e\u4e16\u5e2f\u30fb\u4f4e\u6240\u5f97\uff09"]], "under70": [["A", "\u533a\u5206\u30a2\uff08\u5e74\u53ce\u7d041,160\u4e07\u5186\u4ee5\u4e0a\uff09"], ["I", "\u533a\u5206\u30a4\uff08\u5e74\u53ce\u7d04770\u4e07\u5186\uff5e1,160\u4e07\u5186\uff09"], ["U", "\u533a\u5206\u30a6\uff08\u5e74\u53ce\u7d04370\u4e07\u5186\uff5e770\u4e07\u5186\uff09"], ["E", "\u533a\u5206\u30a8\uff08\uff5e\u5e74\u53ce\u7d04370\u4e07\u5186\uff09"], ["O", "\u533a\u5206\u30aa\uff08\u4f4f\u6c11\u7a0e\u975e\u8ab2\u7a0e\u8005\uff09"]]}, "R8": {"over70": [["A", "\u73fe\u5f79\u4e26\u307f\u2162\uff08\u5e74\u53ce\u7d041,160\u4e07\u5186\u4ee5\u4e0a\uff09"], ["I", "\u73fe\u5f79\u4e26\u307f\u2161\uff08\u5e74\u53ce\u7d04770\u4e07\u5186\uff5e1,160\u4e07\u5186\uff09"], ["U", "\u73fe\u5f79\u4e26\u307f\u2160\uff08\u5e74\u53ce\u7d04370\u4e07\u5186\uff5e770\u4e07\u5186\uff09"], ["E", "\u4e00\u822c\uff08\u5e74\u53ce156\u4e07\uff5e\u7d04370\u4e07\u5186\uff09"], ["LI2", "\u4f4e\u6240\u5f97\u8005\u2161\uff08\u4f4f\u6c11\u7a0e\u975e\u8ab2\u7a0e\u4e16\u5e2f\uff09"], ["LI1", "\u4f4e\u6240\u5f97\u8005\u2160\uff08\u4f4f\u6c11\u7a0e\u975e\u8ab2\u7a0e\u4e16\u5e2f\u30fb\u4f4e\u6240\u5f97\uff09"]], "under70": [["A", "\u533a\u5206\u30a2\uff08\u5e74\u53ce\u7d041,160\u4e07\u5186\u4ee5\u4e0a\uff09"], ["I", "\u533a\u5206\u30a4\uff08\u5e74\u53ce\u7d04770\u4e07\u5186\uff5e1,160\u4e07\u5186\uff09"], ["U", "\u533a\u5206\u30a6\uff08\u5e74\u53ce\u7d04370\u4e07\u5186\uff5e770\u4e07\u5186\uff09"], ["E", "\u533a\u5206\u30a8\uff08\uff5e\u5e74\u53ce\u7d04370\u4e07\u5186\uff09"], ["O", "\u533a\u5206\u30aa\uff08\u4f4f\u6c11\u7a0e\u975e\u8ab2\u7a0e\u8005\uff09"]]}, "R9": {"over70": [["R9_1650_PLUS", "\u7d041,650\u4e07\u5186\u4ee5\u4e0a"], ["R9_1410_1650", "\u7d041,410\u301c1,650\u4e07\u5186"], ["R9_1160_1410", "\u7d041,160\u301c1,410\u4e07\u5186"], ["R9_1040_1160", "\u7d041,040\u301c1,160\u4e07\u5186"], ["R9_950_1040", "\u7d04950\u301c1,040\u4e07\u5186"], ["R9_770_950", "\u7d04770\u301c950\u4e07\u5186"], ["R9_650_770", "\u7d04650\u301c770\u4e07\u5186"], ["R9_510_650", "\u7d04510\u301c650\u4e07\u5186"], ["R9_370_510", "\u7d04370\u301c510\u4e07\u5186"], ["R9_260_370", "\u7d04260\u301c370\u4e07\u5186"], ["R9_200_260", "\u7d04200\u301c260\u4e07\u5186"], ["R9_UNDER_200", "\u7d04200\u4e07\u5186\u4ee5\u4e0b"], ["R9_LOW_INCOME_II", "\u4f4e\u6240\u5f97\u8005\u2161\uff08\u4f4f\u6c11\u7a0e\u975e\u8ab2\u7a0e\u4e16\u5e2f\uff09"], ["R9_LOW_INCOME_I", "\u4f4e\u6240\u5f97\u8005\u2160\uff08\u4f4f\u6c11\u7a0e\u975e\u8ab2\u7a0e\u4e16\u5e2f\u30fb\u4f4e\u6240\u5f97\uff09"]], "under70": [["R9_1650_PLUS", "\u7d041,650\u4e07\u5186\u4ee5\u4e0a"], ["R9_1410_1650", "\u7d041,410\u301c1,650\u4e07\u5186"], ["R9_1160_1410", "\u7d041,160\u301c1,410\u4e07\u5186"], ["R9_1040_1160", "\u7d041,040\u301c1,160\u4e07\u5186"], ["R9_950_1040", "\u7d04950\u301c1,040\u4e07\u5186"], ["R9_770_950", "\u7d04770\u301c950\u4e07\u5186"], ["R9_650_770", "\u7d04650\u301c770\u4e07\u5186"], ["R9_510_650", "\u7d04510\u301c650\u4e07\u5186"], ["R9_370_510", "\u7d04370\u301c510\u4e07\u5186"], ["R9_260_370", "\u7d04260\u301c370\u4e07\u5186"], ["R9_200_260", "\u7d04200\u301c260\u4e07\u5186"], ["R9_UNDER_200", "\u7d04200\u4e07\u5186\u4ee5\u4e0b"], ["R9_EXEMPT_UNDER70", "\u975e\u8ab2\u7a0e\uff0870\u6b73\u672a\u6e80\uff09"]]}} || {};
 // xolair table provided by server: list of rows with numeric fields
-window.XOLAIR_TABLE = {{ xolair_table | tojson | safe }} || [];
+window.XOLAIR_TABLE = [{"dose_mg": 150, "drug": "Xolair", "ige_max": 100.0, "ige_min": 30.0, "interval_weeks": 4, "weight_max": 60.0, "weight_min": 30.0}, {"dose_mg": 150, "drug": "Xolair", "ige_max": 100.0, "ige_min": 30.0, "interval_weeks": 4, "weight_max": 70.0, "weight_min": 60.0}, {"dose_mg": 150, "drug": "Xolair", "ige_max": 100.0, "ige_min": 30.0, "interval_weeks": 4, "weight_max": 90.0, "weight_min": 70.0}, {"dose_mg": 300, "drug": "Xolair", "ige_max": 100.0, "ige_min": 30.0, "interval_weeks": 4, "weight_max": 150.0, "weight_min": 90.0}, {"dose_mg": 300, "drug": "Xolair", "ige_max": 200.0, "ige_min": 100.0, "interval_weeks": 4, "weight_max": 60.0, "weight_min": 30.0}, {"dose_mg": 300, "drug": "Xolair", "ige_max": 200.0, "ige_min": 100.0, "interval_weeks": 4, "weight_max": 70.0, "weight_min": 60.0}, {"dose_mg": 300, "drug": "Xolair", "ige_max": 200.0, "ige_min": 100.0, "interval_weeks": 4, "weight_max": 90.0, "weight_min": 70.0}, {"dose_mg": 225, "drug": "Xolair", "ige_max": 200.0, "ige_min": 100.0, "interval_weeks": 4, "weight_max": 150.0, "weight_min": 90.0}, {"dose_mg": 300, "drug": "Xolair", "ige_max": 300.0, "ige_min": 200.0, "interval_weeks": 4, "weight_max": 60.0, "weight_min": 30.0}, {"dose_mg": 225, "drug": "Xolair", "ige_max": 300.0, "ige_min": 200.0, "interval_weeks": 4, "weight_max": 70.0, "weight_min": 60.0}, {"dose_mg": 225, "drug": "Xolair", "ige_max": 300.0, "ige_min": 200.0, "interval_weeks": 4, "weight_max": 90.0, "weight_min": 70.0}, {"dose_mg": 300, "drug": "Xolair", "ige_max": 300.0, "ige_min": 200.0, "interval_weeks": 4, "weight_max": 150.0, "weight_min": 90.0}, {"dose_mg": 225, "drug": "Xolair", "ige_max": 400.0, "ige_min": 300.0, "interval_weeks": 2, "weight_max": 60.0, "weight_min": 30.0}, {"dose_mg": 225, "drug": "Xolair", "ige_max": 400.0, "ige_min": 300.0, "interval_weeks": 2, "weight_max": 70.0, "weight_min": 60.0}, {"dose_mg": 300, "drug": "Xolair", "ige_max": 400.0, "ige_min": 300.0, "interval_weeks": 2, "weight_max": 90.0, "weight_min": 70.0}, {"dose_mg": 300, "drug": "Xolair", "ige_max": 500.0, "ige_min": 400.0, "interval_weeks": 2, "weight_max": 60.0, "weight_min": 30.0}, {"dose_mg": 300, "drug": "Xolair", "ige_max": 500.0, "ige_min": 400.0, "interval_weeks": 2, "weight_max": 70.0, "weight_min": 60.0}, {"dose_mg": 375, "drug": "Xolair", "ige_max": 500.0, "ige_min": 400.0, "interval_weeks": 2, "weight_max": 90.0, "weight_min": 70.0}, {"dose_mg": 300, "drug": "Xolair", "ige_max": 600.0, "ige_min": 500.0, "interval_weeks": 2, "weight_max": 60.0, "weight_min": 30.0}, {"dose_mg": 375, "drug": "Xolair", "ige_max": 600.0, "ige_min": 500.0, "interval_weeks": 2, "weight_max": 70.0, "weight_min": 60.0}, {"dose_mg": 375, "drug": "Xolair", "ige_max": 700.0, "ige_min": 600.0, "interval_weeks": 2, "weight_max": 60.0, "weight_min": 30.0}] || [];
 document.addEventListener('DOMContentLoaded', function(){
   const systemEl = document.getElementById('system_version');
   const incomeSel = document.getElementById('income_category_select');
@@ -748,7 +929,7 @@ document.addEventListener('DOMContentLoaded', function(){
   // initial populate
   onSelectionChange();
   // restore selected income if server provided one
-  const SELECTED_INCOME = '{{ selected_income_category or "" }}';
+  const SELECTED_INCOME = 'R9_370_510';
   if(SELECTED_INCOME){
     // small delay to ensure options populated
     setTimeout(function(){
@@ -841,7 +1022,7 @@ document.addEventListener('DOMContentLoaded', function(){
 <script>
 document.addEventListener('DOMContentLoaded', function(){
   try{
-    const selected = {{ (selected_oral_ids or []) | tojson }};
+    const selected = [];
     const boxes = document.querySelectorAll('input[name="oral_drug_ids"]');
     boxes.forEach(function(cb){
       try{ cb.checked = Array.isArray(selected) && selected.indexOf(cb.value) !== -1; }catch(e){}
@@ -950,23 +1131,5 @@ document.addEventListener('DOMContentLoaded', function(){
   }catch(e){/* ignore */}
 });
 </script>
-{% if results %}
-<script>
-  window.addEventListener('load', function () {
-    const result = document.getElementById('result-section');
-    if (result) {
-      // Make element focusable for accessibility (if not already)
-      if (!result.hasAttribute('tabindex')) result.setAttribute('tabindex', '-1');
-      // Compute scroll target with an extra offset so the heading isn't flush
-      // against the top of the viewport (prevents header overlap).
-      const offset = 80; // px - adjust if your header height differs
-      const y = result.getBoundingClientRect().top + window.pageYOffset - offset;
-      window.scrollTo({ top: y, behavior: 'smooth' });
-      // After scrolling, focus the heading so keyboard/screen-reader users land here
-      setTimeout(function(){ try{ result.focus(); }catch(e){} }, 450);
-    }
-  });
-</script>
-{% endif %}
 </body>
 </html>
