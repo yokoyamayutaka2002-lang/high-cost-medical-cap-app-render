@@ -1,0 +1,7 @@
+﻿drug_name,strength_mg,price_yen,source_excel,sheet,row
+テオフィリン１００ｍｇ徐放Ｕ錠,100,5.9,mhlw_drug_price_oral_2025-04.xlsx,ＨＰ用,3045
+テオフィリン２００ｍｇ徐放Ｕ錠,200,6.1,mhlw_drug_price_oral_2025-04.xlsx,ＨＰ用,3041
+テオフィリン４００ｍｇ徐放Ｕ錠,400,6.1,mhlw_drug_price_oral_2025-04.xlsx,ＨＰ用,3043
+モンテルカスト錠５ｍｇ,5,18.1,mhlw_drug_price_oral_2025-04.xlsx,ＨＰ用,5333
+モンテルカスト錠１０ｍｇ,10,13.8,mhlw_drug_price_oral_2025-04.xlsx,ＨＰ用,5338
+プランルカスト錠２２５ｍｇ,225,24.4,mhlw_drug_price_oral_2025-04.xlsx,ＨＰ用,5218

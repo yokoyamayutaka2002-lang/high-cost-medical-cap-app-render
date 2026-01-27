@@ -1,0 +1,17 @@
+﻿exact_item_name,class,price_yen,cost_12w_yen,selected,exclusion_reason
+アドエア２５０ディスカス６０吸入用,ICS/LABA,3625.3,609050.4,false,Triple present (Triple overrides other inhalers)
+アドエア１２５エアゾール１２０吸入用,ICS/LABA,3983.8,669278.4,false,Triple present (Triple overrides other inhalers)
+アドエア２５０エアゾール１２０吸入用,ICS/LABA,4354.5,731556.0,false,Triple present (Triple overrides other inhalers)
+ブデホル吸入粉末剤６０吸入,ICS/LABA,,,false,not found in Excel
+フルティフォーム５０エアゾール１２０吸入用,ICS/LABA,4169.0,700392.0,false,Triple present (Triple overrides other inhalers)
+フルティフォーム１２５エアゾール１２０吸入用,ICS/LABA,4340.4,729187.2,false,Triple present (Triple overrides other inhalers)
+レルベア１００エリプタ３０吸入用,ICS/LABA,4829.9,405711.6,false,Triple present (Triple overrides other inhalers)
+レルベア２００エリプタ３０吸入用,ICS/LABA,5220.8,438547.2,false,Triple present (Triple overrides other inhalers)
+テリルジー１００エリプタ３０吸入用,Triple,8502.3,714193.2,true,
+テリルジー２００エリプタ３０吸入用,Triple,9673.8,812599.2,true,
+アテキュラ吸入用カプセル低用量,LAMA,132.4,11121.6,false,Triple present (Triple overrides other inhalers)
+アテキュラ吸入用カプセル中用量,LAMA,144.7,12154.8,false,Triple present (Triple overrides other inhalers)
+アテキュラ吸入用カプセル高用量,LAMA,161.5,13566.0,false,Triple present (Triple overrides other inhalers)
+エナジア吸入用カプセル中用量,Triple,290.3,24385.2,true,
+エナジア吸入用カプセル高用量,Triple,331.5,27846.0,true,
+スピリーバ２．５μｇレスピマット６０吸入,LAMA,3100.9,260475.6,false,Triple present (Triple overrides other inhalers)

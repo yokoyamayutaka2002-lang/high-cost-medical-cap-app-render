@@ -1,0 +1,202 @@
+# mapping.yaml
+# Purpose:
+# - Excel（薬価改定ファイル）の列名ゆれを吸収するためのマッピング定義。
+# - Importer はこのファイルのみを参照し、if/elif 等による薬剤固有分岐を持たないものとする。
+# Matching rules (重要):
+# - 候補リストは上から優先順にマッチされる（最初に見つかった列名を採用）。
+# - マッチが見つからない必須フィールドがある場合、Importer は必ず FAIL（silent fallback 禁止）。
+# - 候補は「厳密一致（case-sensitive）」で比較する実装を想定するが、実運用では Normalizer 側で
+#   前処理（trim, 全角→半角, 全小文字化など）を行うことを推奨する。
+# - 候補に複数の表現（括弧あり/なし、全角/半角、英語併記 等）を列挙すること。
+
+version: "1.0"
+generated_by: "mapping-design"
+generated_at: "2026-01-02"
+
+# REQUIRED fields (must be present in Excel, otherwise FAIL)
+required:
+  # 医薬品名（アプリ側の `drug_name` に対応）
+  excel_drug_name:
+    # 候補は優先順で上から評価される
+    candidates:
+      - "医薬品名"
+      - "薬品名"
+      - "品目名"
+      - "薬品名（一般名／製品名）"
+      - "製品名"
+      - "薬剤名"
+      - "薬価品目名"
+      - "Drug Name"
+      - "商品名"
+      - "品目名称"
+      - "成分名"
+      - "一般名"
+      - "薬名"
+      - "一般的名称"
+      - "成分名（一般名）"
+    note: |
+      # 必須: Excel に上記いずれかの列が存在しない場合は Importer を FAIL にする。
+
+  # 薬価（円、整数） — アプリの price_per_unit 等に使う生データ
+  excel_price_yen:
+    candidates:
+      - "薬価"
+      - "薬価（円）"
+      - "薬価（税抜）"
+      - "薬価（1単位）"
+      - "改定薬価"
+      - "価格(円)"
+      - "Price (Yen)"
+      - "薬価額"
+      - "単価（円）"
+      - "価格"
+      - "単価"
+      - "価格（円）"
+      - "単価（円）"
+      - "薬価（税別）"
+      - "薬価（税込）"
+    normalize:
+      # 候補の値に「,」カンマや全角数字が入る場合の前処理は Normalizer 側が行う
+      - "strip_commas"
+      - "convert_fullwidth_digits"
+    note: |
+      # 必須: 金額は整数であることを期待。小数や計算式があれば検出して FAIL。
+
+  # 規格・含量（例: "250μg/回", "0.5mg"） — drug_id 不変性確保のため必須
+  excel_strength:
+    candidates:
+      - "規格"
+      - "含量"
+      - "規格・含量"
+      - "含量（剤形）"
+      - "規格（含量）"
+      - "規格・用量"
+      - "Strength"
+      - "Content"
+    note: |
+      # 必須化理由: 同一薬品の規格差（例: 250/500）で drug_id を誤生成させないため、canonical_key 構成要素として規格情報は必須とする。
+
+  # Excel 表記そのままの単位テキスト（例: "1錠", "1本"） — weeks_per_unit 決定の必須情報
+  excel_unit_text:
+    candidates:
+      - "単位"
+      - "単位（包装）"
+      - "規格単位"
+      - "単位表記"
+      - "Unit"
+      - "excel_unit_text"
+    note: |
+      # 必須化理由: weeks_per_unit を正しく決めるために単位表記は必須。欠落は計算誤差の原因となる。
+
+# RECOMMENDED / semi-required fields (Import を行うために強く推奨される)
+recommended:
+  # 剤形（例: "注射液", "吸入粉末"）
+  excel_form:
+    candidates:
+      - "剤形"
+      - "剤形区分"
+      - "形状"
+      - "剤形（様式）"
+      - "Form"
+      - "剤形/形状"
+    note: |
+      # 推奨: 剤形があれば packaging/dispense の判定が容易になる。
+
+# (required additions already merged above into `required` block)
+
+# OPTIONAL fields (あると便利 / あれば採用)
+optional:
+  # 用法・投与頻度（例: "1日1回", "4週ごと"）
+  excel_frequency:
+    candidates:
+      - "用法"
+      - "用法・用量"
+      - "用法・用量（投与頻度）"
+      - "投与間隔"
+      - "投与頻度"
+      - "服用頻度"
+      - "Frequency"
+    note: |
+      # 任意: ただし存在する場合は weeks_per_unit を直接決めるのに利用する。
+
+  # 改定年月（Excel に明示される改定日）
+  excel_revision_date:
+    candidates:
+      - "改定年月"
+      - "改定日"
+      - "改定年月日"
+      - "Revision Date"
+      - "改定年度"
+    parse_formats:
+      - "YYYY-MM-DD"
+      - "YYYY/MM/DD"
+      - "YYYY年M月"
+    note: |
+      # 任意: 無ければ Importer 側でファイルのタイムスタンプ or manifest の source_revision を使う。
+
+  # 製造販売元（メーカー）
+  excel_manufacturer:
+    candidates:
+      - "製造販売元"
+      - "販売業者"
+      - "メーカー"
+      - "製造元"
+      - "Manufacturer"
+    note: |
+      # 任意: 同一薬名の絞り込みや canonical_key に有用。
+
+  # 備考欄（フリーコメント）
+  excel_notes:
+    candidates:
+      - "備考"
+      - "注記"
+      - "特記事項"
+      - "Notes"
+    note: |
+      # 任意: 自動処理できない情報を保持するために保存。
+
+  # 補助キー: 製品コード / 収載番号 等 — drug_id 照合精度向上のための補助キー
+  excel_product_code:
+    candidates:
+      - "収載番号"
+      - "YJコード"
+      - "医薬品コード"
+      - "薬価基準収載番号"
+      - "Product Code"
+    note: |
+      # 任意: drug_id 照合精度向上のための補助キー。存在すれば自動照合精度が向上する。
+
+# ADDITIONAL SETTINGS（Importer 実装が参照するためのヒント）
+settings:
+  # マッチ処理の動作（実装に依存するが文書化）
+  match:
+    case_sensitive: false   # 実運用では Normalizer を介して小文字化などを行うことを推奨
+    trim_whitespace: true
+    allow_partial_match: false  # 部分一致を許容しない（ファジーマッチは別レポートで処理）
+  # Failure policy: two-mode operation
+  # - Bootstrap (導入) phase: enable WARN for unmapped rows to allow manual mapping work
+  # - Steady-state (定常運用): strict FAIL for unmapped rows to enforce data integrity
+  # NOTE: Remove or disable failure_policy_bootstrap after master_id_map is complete and mappings stabilized.
+  # Bootstrap policy (例) - comment/uncomment during initial import rollout
+  # failure_policy_bootstrap:
+  #   missing_required: "FAIL"
+  #   unmapped_rows: "WARN"
+  #   unmapped_rows_threshold: 5
+  #   ambiguous_match: "REPORT"
+
+  # Steady-state policy (定常運用用): 保守的に FAIL を返す
+  failure_policy:
+    missing_required: "FAIL"        # 必須フィールドが見つからない場合は失敗
+    unmapped_rows: "WARN"           # 一時的に WARN：薬価取得用に未解決行で FAIL しない
+    ambiguous_match: "REPORT"       # 候補複数一致などは報告（手動対応）
+  reporting:
+    unmapped_output: "unmapped_rows.csv"
+    possible_matches_output: "possible_matches.csv"
+    diff_summary_output: "diff_summary.csv"
+
+# NOTES / OPERATIONAL GUIDANCE
+# - 候補リストは常に増やせる（Excel の改定で列名が変わったらここを updated して CI で検証）
+# - このファイル自体は PR 管理下に置き、変更はレビュー＋CI 通過が必須
+# - Importer は mapping.yaml のみを参照して動作し、薬剤個別の if/elif 分岐を持たないこと
+# - Normalizer（前処理）で行うべき処理：全角→半角、括弧削除/統一、数値カンマ除去、改行除去、小文字化など
+# - 実運用では mapping.yaml と unit_map.csv / master_id_map.csv を組み合わせて Import 処理を行う

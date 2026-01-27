@@ -1,0 +1,1064 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>高額療養費シミュレータ</title>
+  <style>
+    body{font-family:system-ui, sans-serif; padding:20px; line-height:1.45; color:#222; font-size:16px; background:#fffaf2}
+    .card{border:1px solid #e6ded6;padding:14px;border-radius:6px;margin:12px 0; background: #fffefb}
+    .grid{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
+    table{border-collapse:collapse;width:100%}
+    th,td{border:1px solid #ddd;padding:8px;text-align:right}
+    th{text-align:center;background:#f7f7f7}
+    .muted{color:#666;font-size:0.9em}
+    .highlight{background:#ffeeba}
+    /* Responsive improvements */
+    .table-responsive{overflow-x:auto;-webkit-overflow-scrolling:touch}
+    table{min-width:760px}
+    th,td{white-space:nowrap}
+    /* Limit width of top-form selects/inputs so they don't span full page */
+    fieldset.card select,
+    fieldset.card input[type="date"],
+    fieldset.card input[type="number"],
+    fieldset.card textarea,
+    #primary_drug_select,
+    #lama_drug_select,
+    #existing_old_select {
+      display: inline-block;
+      max-width: 520px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    #oral_drug_list { max-width: 520px; width:100%; box-sizing:border-box }
+
+    /* Improve readability: increase spacing in form blocks and labels */
+    fieldset.card { line-height:1.4; padding:14px; }
+    label { display:block; margin-bottom:8px; }
+    .card div { line-height:1.35 }
+    .section-label { font-size:1.08em; font-weight:700; display:block; margin-bottom:8px; }
+
+    /* Constrain result summary card widths so they form a compact grid */
+    .grid .card { flex: 0 0 220px; max-width: 240px; }
+    .grid .card div { text-align: left; }
+    @media (min-width: 1200px) {
+      fieldset.card select, fieldset.card input[type="date"], fieldset.card input[type="number"] { max-width: 480px; }
+      #oral_drug_list { max-width: 480px }
+    }
+    @media (max-width: 1024px){
+      .grid{flex-wrap:wrap}
+      .card{flex:1 1 48%}
+    }
+    @media (max-width: 768px){
+      body{padding:12px}
+      th,td{padding:6px;font-size:0.95em}
+      .card{flex:1 1 100%}
+      table{min-width:640px}
+    }
+    /* Shorten specific form controls that only need small widths */
+    /* Start date is just a date picker, keep it compact */
+    #start_date { max-width: 180px; width: 180px; box-sizing: border-box; }
+    /* qty2/qty3 are small integer inputs (1-3), keep compact */
+    #qty2, #qty3 { max-width: 84px; width: 84px; box-sizing: border-box; }
+    /* subsidy cap: show as shorter numeric input; label simplified below */
+    #subsidy_cap { max-width: 160px; width: 160px; box-sizing: border-box; }
+    /* Larger fonts for main section headings and actions */
+    h1 { font-size: 1.5em; margin-bottom: 10px; }
+    fieldset.card legend { font-size: 1.12em; font-weight: 600; }
+    #existing_legend { font-size: 1.18em; font-weight:700; }
+    /* Make submit button more prominent */
+    button[type="submit"]{ font-size:1.05em; padding:10px 14px; }
+
+    /* Prescription schedule: slightly larger fixed width so headers fit on one line
+       Keep header cells from wrapping, allow body cells to wrap if needed. */
+    /* Apply width constraint to any .card following an h3 (allow intervening elems) */
+    h3 ~ .card { max-width: 840px; }
+    h3 ~ .card .table-responsive { overflow-x: hidden; max-width: 100%; }
+    h3 ~ .card .table-responsive table {
+      min-width: 0;
+      width: 100%;
+      table-layout: auto; /* allow columns to size to content */
+      border-collapse: collapse;
+    }
+    /* Header cells should not wrap so labels like "調整前金額（円）" remain on one line */
+    h3 + .card .table-responsive table th { white-space: nowrap; }
+    /* Body cells may wrap and show content; avoid aggressive truncation */
+    h3 + .card .table-responsive table td {
+      white-space: normal;
+      word-break: normal;
+      overflow: visible;
+      padding: 6px 8px;
+      font-size: 0.95em;
+    }
+
+    /* Results grid: arrange the six summary cards into 3 columns x 2 rows
+       and limit the overall width to match the form/title area so it lines up.
+       Center it horizontally. */
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      align-items: start;
+      margin: 0 0 12px 0;
+      max-width: 720px;
+      width: 100%;
+    }
+    .results-grid .card { max-width: 100%; flex: none; }
+    .results-grid .card strong { display:block; white-space: nowrap; }
+    /* Responsive fallbacks */
+    @media (max-width: 900px){
+      .results-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 600px){
+      .results-grid { grid-template-columns: 1fr; }
+      .results-grid .card strong { white-space: normal; }
+    }
+    /* Warm pastel accents for result cards: green, yellow, red cycling */
+    .results-grid .card:nth-child(3n+1){ background: #f7fff6; border-left:4px solid #bfecc6 }
+    .results-grid .card:nth-child(3n+2){ background: #fffdf0; border-left:4px solid #ffe59a }
+    .results-grid .card:nth-child(3n+3){ background: #fff6f6; border-left:4px solid #ffb6b6 }
+    /* Slight shadow for cards to separate from background */
+    .card{ box-shadow: 0 1px 0 rgba(0,0,0,0.04) }
+  </style>
+</head>
+<body>
+  <h1>高額療養費シミュレータ</h1>
+  <form method="post" action="/calculate">
+    <fieldset class="card">
+      <legend>生物学的製剤</legend>
+      <label>薬剤: <select id="drug_id" name="drug_id">
+        
+        
+          
+            <option value="dupixent_300" >dupixent_300 - デュピクセント皮下注300mgペン</option>
+          
+        
+          
+            <option value="tezspire" >tezspire - テゼスパイア皮下注210mgペン</option>
+          
+        
+          
+            <option value="nucala" >nucala - ヌーカラ皮下注100mgペン</option>
+          
+        
+          
+            <option value="fasenra" >fasenra - ファセンラ皮下注30mgペン</option>
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+          <option value="xolair" >xolair - ゾレア（IgE/体重で投与量が決まります）</option>
+        
+      </select></label>
+      <div id="xolair_panel" style="display:none;margin-top:8px">
+        <label>Xolair 用 IgE (IU/mL): <input id="xolair_ige" name="xolair_ige" type="number" min="0" step="1"/></label>
+        <label style="margin-left:12px">体重 (kg): <input id="xolair_weight" name="xolair_weight" type="number" min="0" step="0.1"/></label>
+        <div id="xolair_display" class="muted" style="margin-top:6px">Xolair: -</div>
+      </div>
+      <br>
+      <label>開始日: <input id="start_date" type="date" name="start_date" value="2026-01-14"/></label>
+      <br>
+      <label>2回目処方 本数: <input id="qty2" type="number" name="qty2" min="1" value="1"/></label>
+      <br>
+      <label>3回目処方 本数: <input id="qty3" type="number" name="qty3" min="1" value="1"/></label>
+      <br>
+      <!-- 投与間隔（週）: UIから削除しました -->
+      <label>制度: 
+        <select name="system_version" id="system_version">
+          
+          <option value="R7" >R7</option>
+          
+          <option value="R8" >R8</option>
+          
+          <option value="R9" selected>R9</option>
+          
+        </select>
+      </label>
+      <br>
+      <label>年齢区分:
+        <select name="age_group" id="age_group">
+          <option value="under70" selected>70歳未満</option>
+          <option value="over70" >70歳以上</option>
+        </select>
+      </label>
+      <br>
+      <label>所得区分: 
+        <select name="income_category" id="income_category_select">
+          <!-- options populated by JS based on selected system and age_group -->
+        </select>
+      </label>
+      <br>
+      <label>自己負担割合: 
+        <select name="burden_ratio">
+          <option value="0.3" selected>30%</option>
+          <option value="0.2">20%</option>
+          <option value="0.1">10%</option>
+        </select>
+      </label>
+      <br>
+      <label><input type="checkbox" id="use_medical_deduction" name="use_medical_deduction" checked/> 確定申告（医療費控除）を考慮する</label>
+      <div id="taxable_income_field" style="display:none;margin-top:6px">
+        <label>課税所得（円）: <input id="taxable_income" name="taxable_income" type="number" min="0" step="1000" value="3000000"/></label>
+      </div>
+      <br>
+      <label style="display:inline-block"> <input type="checkbox" name="use_subsidy" id="use_subsidy" checked/> 付加給付制度あり　月額（円）：
+        <input type="number" name="subsidy_cap" id="subsidy_cap" value="20000" style="width:140px; box-sizing:border-box; margin-left:6px"/>
+      </label>
+    </fieldset>
+
+    <fieldset class="card" id="prescription_steps_field">
+      <legend>処方ステッププレビュー（Dupixent 用）</legend>
+      <div id="prescription_steps">
+        <div>1回目: <span id="step1_date" class="muted">-</span> <span id="step1_days" class="muted">-</span></div>
+        <div>2回目: <span id="step2_date" class="muted">-</span> <span id="step2_days" class="muted">-</span></div>
+        <div>3回目: <span id="step3_date" class="muted">-</span> <span id="step3_days" class="muted">-</span></div>
+        <div>4回目: <span id="step4_date" class="muted">-</span> <span id="step4_days" class="muted">-</span></div>
+        <div id="maintenance_note" class="muted" style="display:none">以降: 6本を84日ごとに投与</div>
+      </div>
+    </fieldset>
+
+    <fieldset class="card">
+      <legend id="existing_legend">既存治療</legend>
+      <input type="hidden" name="existing_mode" value="csv" />
+
+      <div style="margin-top:8px; text-align:left">
+        
+        <label class="section-label">吸入薬を選択</label>
+        <select name="primary_drug_ids" id="primary_drug_select" multiple size="6" style="display:block; width:100%; margin-bottom:8px; text-align:left">
+          
+          <option value="アテキュラ吸入用カプセル中用量" data-class="ICS/LABA" data-weekly="304" >アテキュラ吸入用カプセル中用量（週 304 円）</option>
+          
+          <option value="アテキュラ吸入用カプセル低用量" data-class="ICS/LABA" data-weekly="278" >アテキュラ吸入用カプセル低用量（週 278 円）</option>
+          
+          <option value="アテキュラ吸入用カプセル高用量" data-class="ICS/LABA" data-weekly="339" >アテキュラ吸入用カプセル高用量（週 339 円）</option>
+          
+          <option value="アドエア125エアゾール120吸入用" data-class="ICS/LABA" data-weekly="279" >アドエア125エアゾール120吸入用（週 279 円）</option>
+          
+          <option value="アドエア250エアゾール120吸入用" data-class="ICS/LABA" data-weekly="305" >アドエア250エアゾール120吸入用（週 305 円）</option>
+          
+          <option value="アドエア250ディスカス60吸入用" data-class="ICS/LABA" data-weekly="254" >アドエア250ディスカス60吸入用（週 254 円）</option>
+          
+          <option value="アドエア500ディスカス60吸入用" data-class="ICS/LABA" data-weekly="277" >アドエア500ディスカス60吸入用（週 277 円）</option>
+          
+          <option value="エナジア吸入用カプセル中用量" data-class="Triple" data-weekly="610" >エナジア吸入用カプセル中用量（週 610 円）</option>
+          
+          <option value="エナジア吸入用カプセル高用量" data-class="Triple" data-weekly="696" >エナジア吸入用カプセル高用量（週 696 円）</option>
+          
+          <option value="テリルジー100エリプタ30吸入用" data-class="Triple" data-weekly="595" >テリルジー100エリプタ30吸入用（週 595 円）</option>
+          
+          <option value="テリルジー200エリプタ30吸入用" data-class="Triple" data-weekly="677" >テリルジー200エリプタ30吸入用（週 677 円）</option>
+          
+          <option value="フルティフォーム125エアゾール120吸入用(1日4吸入)" data-class="ICS/LABA" data-weekly="304" >フルティフォーム125エアゾール120吸入用(1日4吸入)（週 304 円）</option>
+          
+          <option value="フルティフォーム125エアゾール120吸入用(1日6吸入)" data-class="ICS/LABA" data-weekly="456" >フルティフォーム125エアゾール120吸入用(1日6吸入)（週 456 円）</option>
+          
+          <option value="フルティフォーム125エアゾール120吸入用(1日8吸入)" data-class="ICS/LABA" data-weekly="608" >フルティフォーム125エアゾール120吸入用(1日8吸入)（週 608 円）</option>
+          
+          <option value="フルティフォーム50エアゾール120吸入用" data-class="ICS/LABA" data-weekly="292" >フルティフォーム50エアゾール120吸入用（週 292 円）</option>
+          
+          <option value="ブデホル吸入粉末剤60吸入(1日4吸入)" data-class="ICS/LABA" data-weekly="171" >ブデホル吸入粉末剤60吸入(1日4吸入)（週 171 円）</option>
+          
+          <option value="ブデホル吸入粉末剤60吸入(1日6吸入)" data-class="ICS/LABA" data-weekly="257" >ブデホル吸入粉末剤60吸入(1日6吸入)（週 257 円）</option>
+          
+          <option value="ブデホル吸入粉末剤60吸入(1日8吸入)" data-class="ICS/LABA" data-weekly="342" >ブデホル吸入粉末剤60吸入(1日8吸入)（週 342 円）</option>
+          
+          <option value="レルベア100エリプタ30吸入用" data-class="ICS/LABA" data-weekly="338" >レルベア100エリプタ30吸入用（週 338 円）</option>
+          
+          <option value="レルベア200エリプタ30吸入用" data-class="ICS/LABA" data-weekly="365" >レルベア200エリプタ30吸入用（週 365 円）</option>
+          
+        </select>
+
+        <label class="section-label">LAMAを選択</label>
+        <select name="lama_drug_id" id="lama_drug_select" style="display:block; width:100%; margin-bottom:8px; text-align:left">
+          <option value="">-- 選択しない --</option>
+          
+          <option value="スピリーバ2.5μgレスピマット60吸入" data-class="LAMA" data-weekly="217" >スピリーバ2.5μgレスピマット60吸入（週 217 円）</option>
+          
+        </select>
+
+        <label class="section-label">内服薬を選択</label>
+        <div id="oral_drug_list" style="max-height:200px;overflow:auto;border:1px solid #eee;padding:6px; text-align:left">
+          
+          <div style="margin-bottom:4px">
+            <label style="white-space:nowrap"><input type="checkbox" name="oral_drug_ids" value="テオフィリン１００ｍｇ徐放Ｕ錠|100" data-weekly="41" /> テオフィリン１００ｍｇ徐放Ｕ錠 100（週 41 円）</label>
+          </div>
+          
+          <div style="margin-bottom:4px">
+            <label style="white-space:nowrap"><input type="checkbox" name="oral_drug_ids" value="テオフィリン２００ｍｇ徐放Ｕ錠|200" data-weekly="43" /> テオフィリン２００ｍｇ徐放Ｕ錠 200（週 43 円）</label>
+          </div>
+          
+          <div style="margin-bottom:4px">
+            <label style="white-space:nowrap"><input type="checkbox" name="oral_drug_ids" value="テオフィリン４００ｍｇ徐放Ｕ錠|400" data-weekly="43" /> テオフィリン４００ｍｇ徐放Ｕ錠 400（週 43 円）</label>
+          </div>
+          
+          <div style="margin-bottom:4px">
+            <label style="white-space:nowrap"><input type="checkbox" name="oral_drug_ids" value="プランルカスト錠２２５ｍｇ|225" data-weekly="342" /> プランルカスト錠２２５ｍｇ 225（週 342 円）</label>
+          </div>
+          
+          <div style="margin-bottom:4px">
+            <label style="white-space:nowrap"><input type="checkbox" name="oral_drug_ids" value="モンテルカスト錠１０ｍｇ|10" data-weekly="97" /> モンテルカスト錠１０ｍｇ 10（週 97 円）</label>
+          </div>
+          
+          <div style="margin-bottom:4px">
+            <label style="white-space:nowrap"><input type="checkbox" name="oral_drug_ids" value="モンテルカスト錠５ｍｇ|5" data-weekly="127" /> モンテルカスト錠５ｍｇ 5（週 127 円）</label>
+          </div>
+          
+        </div>
+        <div class="muted">既存治療 合計週額: <span id="oral_weekly_sum">0</span> 円</div>
+        <span id="lama_helper" class="muted" style="margin-left:8px;display:none">※Triple 選択時は LAMA を併用できません</span>
+        
+      </div>
+    </fieldset>
+
+    <div style="margin-top:12px"><button type="submit">計算実行</button></div>
+  </form>
+
+  
+
+  
+  
+  
+  
+  <div style="margin-bottom:10px;border-left:4px solid #eee;padding:8px 12px;background:#fafafa">
+    <div><strong>生物学的製剤：</strong> dupixent</div>
+    <div style="margin-top:4px"><strong>既存治療：</strong> —</div>
+  </div>
+  
+  <h2>結果</h2>
+  
+  <div style="margin-bottom:10px;border-left:4px solid #eee;padding:8px 12px;background:#fafafa">
+    <div><strong>生物学的製剤：</strong> dupixent</div>
+    <div style="margin-top:4px"><strong>既存治療：</strong> —</div>
+  </div>
+  
+  <div class="results-grid">
+    
+    <!-- New ①: start-year annual (formerly ④) -->
+    <div class="card">
+      <strong>① 2026年度</strong>
+      <div>既存治療</div>
+      <div style="font-size:1.1em">¥0/年</div>
+      <div>生物学的製剤を追加した場合</div>
+      <div style="font-size:1.1em">¥0/年</div>
+      <div>差額</div>
+      <div style="font-size:1.1em">¥0/年</div>
+      
+      <div style="margin-top:6px">付加給付調整後</div>
+      <div style="font-size:1.1em">¥0/年</div>
+      <div>差額（付加給付後）</div>
+      <div style="font-size:1.1em">¥0/年</div>
+      
+      
+      <div style="margin-top:8px;color:#2b6; font-weight:700">医療費控除（還付） 合計：<strong>¥0</strong></div>
+      <div>所得税： ¥0</div>
+      <div>住民税： ¥0</div>
+      <div style="margin-top:6px;">自己負担（医療費控除後）</div>
+      <div style="font-size:1.1em">¥0</div>
+      
+      <div>差額（医療費控除後）</div>
+      
+      <div style="font-size:1.1em">¥0/年</div>
+      
+      
+    </div>
+
+    <!-- New ②: next-year annual (formerly ⑤) -->
+    <div class="card">
+      <strong>② 2027年度</strong>
+      <div>既存治療</div>
+      <div style="font-size:1.1em">¥0/年</div>
+      <div>生物学的製剤を追加した場合</div>
+      <div style="font-size:1.1em">¥0/年</div>
+      <div>差額</div>
+      <div style="font-size:1.1em">¥0/年</div>
+      
+      <div style="margin-top:6px">付加給付調整後</div>
+      <div style="font-size:1.1em">¥0/年</div>
+      <div>差額（付加給付後）</div>
+      <div style="font-size:1.1em">¥0/年</div>
+      
+      
+      <div style="margin-top:8px;color:#2b6; font-weight:700">医療費控除（還付） 合計：<strong>¥0</strong></div>
+      <div>所得税： ¥0</div>
+      <div>住民税： ¥0</div>
+      <div style="margin-top:6px;">自己負担（医療費控除後）</div>
+      <div style="font-size:1.1em">¥0</div>
+      
+      <div>差額（医療費控除後）</div>
+      
+      <div style="font-size:1.1em">¥0/年</div>
+      
+      
+    </div>
+
+    <!-- New ③: ①の月額 (calendar_start_monthly_equiv) -->
+    <div class="card">
+      <strong>③ 2026年度の月額（4週）</strong>
+      <div>既存治療</div>
+      <div style="font-size:1.1em">¥0/月（4週）</div>
+      <div>生物学的製剤を追加した場合</div>
+      <div style="font-size:1.1em">¥0/月（4週）</div>
+      <div>差額</div>
+      <div style="font-size:1.1em">¥0/月（4週）</div>
+      
+      <div style="margin-top:6px">付加給付調整後</div>
+      <div style="font-size:1.1em">¥0/月（4週）</div>
+      <div>差額（付加給付後）</div>
+      <div style="font-size:1.1em">¥0/月（4週）</div>
+      
+      
+      <div style="margin-top:6px;">自己負担（医療費控除後）</div>
+      <div style="font-size:1.1em">¥/月（4週）</div>
+      <div>差額（医療費控除後）</div>
+      <div style="font-size:1.1em">¥/月（4週）</div>
+      
+    </div>
+
+    <!-- New ④: ②の月額 (calendar_next_monthly_equiv) -->
+    <div class="card">
+      <strong>④ 2027年度の月額（4週）</strong>
+      <div>既存治療</div>
+      <div style="font-size:1.1em">¥0/月（4週）</div>
+      <div>生物学的製剤を追加した場合</div>
+      <div style="font-size:1.1em">¥0/月（4週）</div>
+      <div>差額</div>
+      <div style="font-size:1.1em">¥0/月（4週）</div>
+      
+      <div style="margin-top:6px">付加給付調整後</div>
+      <div style="font-size:1.1em">¥0/月（4週）</div>
+      <div>差額（付加給付後）</div>
+      <div style="font-size:1.1em">¥0/月（4週）</div>
+      
+      
+      <div style="margin-top:6px;">自己負担（医療費控除後）</div>
+      <div style="font-size:1.1em">¥/月（4週）</div>
+      <div>差額（医療費控除後）</div>
+      <div style="font-size:1.1em">¥/月（4週）</div>
+      
+    </div>
+    
+  </div>
+  
+  
+  
+
+  
+  <h3>処方スケジュール</h3>
+  
+  <div class="card">
+    <div class="table-responsive">
+      <table>
+      <thead>
+        <tr>
+          <th>回</th>
+          <th>処方日</th>
+          <th>本数</th>
+          <th>調整前金額（円）</th>
+          <th>自己負担金額（円）</th>
+          
+          <th>付加給付調整後（円）</th>
+          
+          <th>投与期間</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+        
+        
+        
+        <tr>
+          <td style="text-align:center">1</td>
+          <td style="text-align:left">2026-01-14</td>
+          <td style="text-align:center">2 本</td>
+          <td style="text-align:right">¥60000</td>
+          <td style="text-align:right">¥0</td>
+          
+          <td style="text-align:right">¥0</td>
+          
+          <td style="text-align:right">14日 (2週)</td>
+        </tr>
+        
+        
+        
+        <tr>
+          <td style="text-align:center">2</td>
+          <td style="text-align:left">2026-01-28</td>
+          <td style="text-align:center">1 本</td>
+          <td style="text-align:right">¥30000</td>
+          <td style="text-align:right">¥0</td>
+          
+          <td style="text-align:right">¥0</td>
+          
+          <td style="text-align:right">14日 (2週)</td>
+        </tr>
+        
+        
+        
+        <tr>
+          <td style="text-align:center">3</td>
+          <td style="text-align:left">2026-02-11</td>
+          <td style="text-align:center">1 本</td>
+          <td style="text-align:right">¥30000</td>
+          <td style="text-align:right">¥0</td>
+          
+          <td style="text-align:right">¥0</td>
+          
+          <td style="text-align:right">14日 (2週)</td>
+        </tr>
+        
+        
+        
+        <tr>
+          <td style="text-align:center">4</td>
+          <td style="text-align:left">2026-02-25</td>
+          <td style="text-align:center">6 本</td>
+          <td style="text-align:right">¥180000</td>
+          <td style="text-align:right">¥0</td>
+          
+          <td style="text-align:right">¥0</td>
+          
+          <td style="text-align:right">84日 (12週)</td>
+        </tr>
+        
+        
+        
+        <tr>
+          <td style="text-align:center">5</td>
+          <td style="text-align:left">2026-05-20</td>
+          <td style="text-align:center">6 本</td>
+          <td style="text-align:right">¥180000</td>
+          <td style="text-align:right">¥0</td>
+          
+          <td style="text-align:right">¥0</td>
+          
+          <td style="text-align:right">84日 (12週)</td>
+        </tr>
+        
+        
+        
+        <tr>
+          <td style="text-align:center">6</td>
+          <td style="text-align:left">2026-08-12</td>
+          <td style="text-align:center">6 本</td>
+          <td style="text-align:right">¥180000</td>
+          <td style="text-align:right">¥0</td>
+          
+          <td style="text-align:right">¥0</td>
+          
+          <td style="text-align:right">84日 (12週)</td>
+        </tr>
+        
+        
+        
+        <tr>
+          <td style="text-align:center">7</td>
+          <td style="text-align:left">2026-11-04</td>
+          <td style="text-align:center">6 本</td>
+          <td style="text-align:right">¥180000</td>
+          <td style="text-align:right">¥0</td>
+          
+          <td style="text-align:right">¥0</td>
+          
+          <td style="text-align:right">84日 (12週)</td>
+        </tr>
+        
+        
+        
+        <tr>
+          <td style="text-align:center">8</td>
+          <td style="text-align:left">2027-01-27</td>
+          <td style="text-align:center">6 本</td>
+          <td style="text-align:right">¥180000</td>
+          <td style="text-align:right">¥0</td>
+          
+          <td style="text-align:right">¥0</td>
+          
+          <td style="text-align:right">84日 (12週)</td>
+        </tr>
+        
+        
+        
+        <tr>
+          <td style="text-align:center">9</td>
+          <td style="text-align:left">2027-04-21</td>
+          <td style="text-align:center">6 本</td>
+          <td style="text-align:right">¥180000</td>
+          <td style="text-align:right">¥0</td>
+          
+          <td style="text-align:right">¥0</td>
+          
+          <td style="text-align:right">84日 (12週)</td>
+        </tr>
+        
+        
+        
+        <tr>
+          <td style="text-align:center">10</td>
+          <td style="text-align:left">2027-07-14</td>
+          <td style="text-align:center">6 本</td>
+          <td style="text-align:right">¥180000</td>
+          <td style="text-align:right">¥0</td>
+          
+          <td style="text-align:right">¥0</td>
+          
+          <td style="text-align:right">84日 (12週)</td>
+        </tr>
+        
+        
+        
+        <tr>
+          <td style="text-align:center">11</td>
+          <td style="text-align:left">2027-10-06</td>
+          <td style="text-align:center">6 本</td>
+          <td style="text-align:right">¥180000</td>
+          <td style="text-align:right">¥0</td>
+          
+          <td style="text-align:right">¥0</td>
+          
+          <td style="text-align:right">84日 (12週)</td>
+        </tr>
+        
+        
+        
+        <tr>
+          <td style="text-align:center">12</td>
+          <td style="text-align:left">2027-12-29</td>
+          <td style="text-align:center">6 本</td>
+          <td style="text-align:right">¥180000</td>
+          <td style="text-align:right">¥0</td>
+          
+          <td style="text-align:right">¥0</td>
+          
+          <td style="text-align:right">84日 (12週)</td>
+        </tr>
+        
+      </tbody>
+      </table>
+    </div>
+  </div>
+  
+
+<script>
+function toggleMode(v){
+  document.getElementById('csv_mode').style.display = v==='csv'? 'block':'none';
+  document.getElementById('manual_mode').style.display = v==='manual'? 'block':'none';
+}
+
+// Dupixent step preview logic (client-side, immediate UX feedback)
+function parseDate(s){
+  if(!s) return null;
+  const p = s.split('-');
+  if(p.length!==3) return null;
+  return new Date(Number(p[0]), Number(p[1])-1, Number(p[2]));
+}
+function formatDate(d){
+  if(!d) return '-';
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+function addDays(d, days){
+  if(!d) return null;
+  const nd = new Date(d.getTime());
+  nd.setDate(nd.getDate() + Number(days));
+  return nd;
+}
+
+function updateDupixentPreview(){
+  const drug = (document.getElementById('drug_id')||{}).value || '';
+  const k = (drug||'').toLowerCase();
+  const isDup = k.indexOf('dupixent') !== -1 || k.indexOf('デュピクセント') !== -1;
+  const startVal = document.getElementById('start_date').value;
+  const qty2Val = Number(document.getElementById('qty2').value || 0);
+  const qty3Val = Number(document.getElementById('qty3').value || 0);
+
+  const step2El = document.getElementById('step2_date');
+  const step3El = document.getElementById('step3_date');
+  const step4El = document.getElementById('step4_date');
+  const field = document.getElementById('prescription_steps_field');
+
+  if(!isDup){
+    // hide Dupixent preview for other drugs
+    field.style.display = 'none';
+    return;
+  }
+  field.style.display = 'block';
+  const sd = parseDate(startVal);
+  const s1DateEl = document.getElementById('step1_date');
+  const s1DaysEl = document.getElementById('step1_days');
+  const s2DaysEl = document.getElementById('step2_days');
+  const s3DaysEl = document.getElementById('step3_days');
+  const s4DaysEl = document.getElementById('step4_days');
+  const maintenanceNote = document.getElementById('maintenance_note');
+
+  if(!sd){
+    s1DateEl.textContent = '-'; s1DaysEl.textContent='-';
+    step2El.textContent='-'; s2DaysEl.textContent='-';
+    step3El.textContent='-'; s3DaysEl.textContent='-';
+    step4El.textContent='-'; s4DaysEl.textContent='-';
+    maintenanceNote.style.display = 'none';
+    return;
+  }
+
+  // 1回目: start, days fixed 14
+  s1DateEl.textContent = formatDate(sd);
+  s1DaysEl.textContent = '14日';
+
+  // second = start + 14d
+  const d2 = addDays(sd, 14);
+  step2El.textContent = formatDate(d2);
+  const d2_days = qty2Val > 0 ? qty2Val * 14 : '-';
+  s2DaysEl.textContent = (d2_days === '-') ? '-' : (d2_days + '日');
+
+  // third = second + (qty2 * 14d)
+  if(qty2Val > 0){
+    const d3 = addDays(d2, qty2Val * 14);
+    step3El.textContent = formatDate(d3);
+    const d3_days = qty3Val > 0 ? qty3Val * 14 : '-';
+    s3DaysEl.textContent = (d3_days === '-') ? '-' : (d3_days + '日');
+    // fourth = third + (qty3 * 14d)
+    if(qty3Val > 0){
+      const d4 = addDays(d3, qty3Val * 14);
+      step4El.textContent = formatDate(d4);
+      s4DaysEl.textContent = (6 * 14) + '日';
+      maintenanceNote.style.display = 'block';
+    } else {
+      step4El.textContent = '-'; s4DaysEl.textContent = '-'; maintenanceNote.style.display = 'none';
+    }
+  } else {
+    step3El.textContent = '-'; s3DaysEl.textContent='-';
+    step4El.textContent = '-'; s4DaysEl.textContent='-'; maintenanceNote.style.display = 'none';
+  }
+}
+
+function updateFasenraInputs(){
+  const drug = (document.getElementById('drug_id')||{}).value || '';
+  const k = (drug||'').toLowerCase();
+  const isFasenra = k.indexOf('fasenra') !== -1 || k.indexOf('ファセンラ') !== -1;
+  const qty2El = document.getElementById('qty2');
+  const qty3El = document.getElementById('qty3');
+  if(!qty2El || !qty3El) return;
+  if(isFasenra){
+    // For Fasenra, second and third prescription quantities are always 1.
+    try{ qty2El.value = 1; }catch(e){}
+    try{ qty3El.value = 1; }catch(e){}
+    // Make inputs readonly so value is submitted but cannot be edited.
+    qty2El.readOnly = true;
+    qty3El.readOnly = true;
+    // Also visually indicate disabled state
+    qty2El.style.backgroundColor = '#f3f3f3';
+    qty3El.style.backgroundColor = '#f3f3f3';
+  } else {
+    qty2El.readOnly = false;
+    qty3El.readOnly = false;
+    qty2El.style.backgroundColor = '';
+    qty3El.style.backgroundColor = '';
+  }
+}
+
+function updateExistingAggregationText(){
+  const drug = (document.getElementById('drug_id')||{}).value || '';
+  const k = (drug||'').toLowerCase();
+  const isFasenra = k.indexOf('fasenra') !== -1 || k.indexOf('ファセンラ') !== -1;
+  const legend = document.getElementById('existing_legend');
+  const header = document.getElementById('existing_header_text');
+  const muted = document.getElementById('existing_muted');
+  // Always display the simplified legend text
+  if(legend) legend.textContent = '既存治療';
+  // Optionally update helper text for Fasenra, but keep legend consistent
+  if(isFasenra){
+    if(header) header.textContent = '既存治療（8週分）を合算します';
+    if(muted) muted.textContent = '既存治療は 8 週分として合算されます';
+  } else {
+    if(header) header.textContent = '既存治療（12週分）を合算します';
+    if(muted) muted.textContent = '既存治療は 12 週分として合算されます';
+  }
+}
+
+function updateXolairUI(){
+  const drug = (document.getElementById('drug_id')||{}).value || '';
+  const k = (drug||'').toLowerCase();
+  const isXolair = k === 'xolair' || k.indexOf('xolair') !== -1;
+  const panel = document.getElementById('xolair_panel');
+  const display = document.getElementById('xolair_display');
+  const igeEl = document.getElementById('xolair_ige');
+  const wtEl = document.getElementById('xolair_weight');
+  if(!panel || !display || !igeEl || !wtEl) return;
+  if(!isXolair){
+    panel.style.display = 'none';
+    display.textContent = 'Xolair: -';
+    return;
+  }
+  panel.style.display = 'block';
+  const ige = Number(igeEl.value || NaN);
+  const wt = Number(wtEl.value || NaN);
+  // Use embedded table (provided by server) to compute dose deterministically
+  try{
+    const T = window.XOLAIR_TABLE || [];
+    let found = null;
+    for(let i=0;i<T.length;i++){
+      const r = T[i];
+      // numeric comparisons: ige_min <= ige < ige_max and weight_min <= wt < weight_max
+      if(!isNaN(ige) && !isNaN(wt)){
+        if(Number(r.ige_min) <= ige && ige < Number(r.ige_max) && Number(r.weight_min) <= wt && wt < Number(r.weight_max)){
+          found = r; break;
+        }
+      }
+    }
+    if(found){
+      display.textContent = `Xolair: ${found.dose_mg} mg every ${found.interval_weeks} weeks`;
+    } else {
+      display.textContent = 'Xolair: No recommended dose for provided IgE/weight combination';
+    }
+  }catch(e){
+    display.textContent = 'Xolair: -';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  const els = ['start_date','qty2','qty3','drug_id'];
+  els.forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.addEventListener('change', function(e){ updateDupixentPreview(); updateFasenraInputs(); updateExistingAggregationText(); updateXolairUI(); });
+    el.addEventListener('input', function(e){ updateDupixentPreview(); updateFasenraInputs(); updateExistingAggregationText(); updateXolairUI(); });
+  });
+  // initial run
+  updateDupixentPreview();
+  updateFasenraInputs();
+  updateExistingAggregationText();
+  updateXolairUI();
+  // ensure existing_mode UI reflects server-provided selection
+  try{ var existingModeEl = document.getElementById('existing_mode'); if(existingModeEl) toggleMode(existingModeEl.value); }catch(e){}
+  try{
+    var xige = document.getElementById('xolair_ige'); if(xige){ xige.addEventListener('input', updateXolairUI); xige.addEventListener('change', updateXolairUI); }
+    var xwt = document.getElementById('xolair_weight'); if(xwt){ xwt.addEventListener('input', updateXolairUI); xwt.addEventListener('change', updateXolairUI); }
+  }catch(e){}
+});
+</script>
+<script>
+// income_map is provided by server as JSON-compatible object
+const INCOME_MAP = {"R7": {"over70": [["A", "\u73fe\u5f79\u4e26\u307f\u2162\uff08\u5e74\u53ce\u7d041,160\u4e07\u5186\u4ee5\u4e0a\uff09"], ["I", "\u73fe\u5f79\u4e26\u307f\u2161\uff08\u5e74\u53ce\u7d04770\u4e07\u5186\uff5e1,160\u4e07\u5186\uff09"], ["U", "\u73fe\u5f79\u4e26\u307f\u2160\uff08\u5e74\u53ce\u7d04370\u4e07\u5186\uff5e770\u4e07\u5186\uff09"], ["E", "\u4e00\u822c\uff08\u5e74\u53ce156\u4e07\uff5e\u7d04370\u4e07\u5186\uff09"], ["LI2", "\u4f4e\u6240\u5f97\u8005\u2161\uff08\u4f4f\u6c11\u7a0e\u975e\u8ab2\u7a0e\u4e16\u5e2f\uff09"], ["LI1", "\u4f4e\u6240\u5f97\u8005\u2160\uff08\u4f4f\u6c11\u7a0e\u975e\u8ab2\u7a0e\u4e16\u5e2f\u30fb\u4f4e\u6240\u5f97\uff09"]], "under70": [["A", "\u533a\u5206\u30a2\uff08\u5e74\u53ce\u7d041,160\u4e07\u5186\u4ee5\u4e0a\uff09"], ["I", "\u533a\u5206\u30a4\uff08\u5e74\u53ce\u7d04770\u4e07\u5186\uff5e1,160\u4e07\u5186\uff09"], ["U", "\u533a\u5206\u30a6\uff08\u5e74\u53ce\u7d04370\u4e07\u5186\uff5e770\u4e07\u5186\uff09"], ["E", "\u533a\u5206\u30a8\uff08\uff5e\u5e74\u53ce\u7d04370\u4e07\u5186\uff09"], ["O", "\u533a\u5206\u30aa\uff08\u4f4f\u6c11\u7a0e\u975e\u8ab2\u7a0e\u8005\uff09"]]}, "R8": {"over70": [["A", "\u73fe\u5f79\u4e26\u307f\u2162\uff08\u5e74\u53ce\u7d041,160\u4e07\u5186\u4ee5\u4e0a\uff09"], ["I", "\u73fe\u5f79\u4e26\u307f\u2161\uff08\u5e74\u53ce\u7d04770\u4e07\u5186\uff5e1,160\u4e07\u5186\uff09"], ["U", "\u73fe\u5f79\u4e26\u307f\u2160\uff08\u5e74\u53ce\u7d04370\u4e07\u5186\uff5e770\u4e07\u5186\uff09"], ["E", "\u4e00\u822c\uff08\u5e74\u53ce156\u4e07\uff5e\u7d04370\u4e07\u5186\uff09"], ["LI2", "\u4f4e\u6240\u5f97\u8005\u2161\uff08\u4f4f\u6c11\u7a0e\u975e\u8ab2\u7a0e\u4e16\u5e2f\uff09"], ["LI1", "\u4f4e\u6240\u5f97\u8005\u2160\uff08\u4f4f\u6c11\u7a0e\u975e\u8ab2\u7a0e\u4e16\u5e2f\u30fb\u4f4e\u6240\u5f97\uff09"]], "under70": [["A", "\u533a\u5206\u30a2\uff08\u5e74\u53ce\u7d041,160\u4e07\u5186\u4ee5\u4e0a\uff09"], ["I", "\u533a\u5206\u30a4\uff08\u5e74\u53ce\u7d04770\u4e07\u5186\uff5e1,160\u4e07\u5186\uff09"], ["U", "\u533a\u5206\u30a6\uff08\u5e74\u53ce\u7d04370\u4e07\u5186\uff5e770\u4e07\u5186\uff09"], ["E", "\u533a\u5206\u30a8\uff08\uff5e\u5e74\u53ce\u7d04370\u4e07\u5186\uff09"], ["O", "\u533a\u5206\u30aa\uff08\u4f4f\u6c11\u7a0e\u975e\u8ab2\u7a0e\u8005\uff09"]]}, "R9": {"over70": [["R9_1650_PLUS", "\u7d041,650\u4e07\u5186\u4ee5\u4e0a"], ["R9_1410_1650", "\u7d041,410\u301c1,650\u4e07\u5186"], ["R9_1160_1410", "\u7d041,160\u301c1,410\u4e07\u5186"], ["R9_1040_1160", "\u7d041,040\u301c1,160\u4e07\u5186"], ["R9_950_1040", "\u7d04950\u301c1,040\u4e07\u5186"], ["R9_770_950", "\u7d04770\u301c950\u4e07\u5186"], ["R9_650_770", "\u7d04650\u301c770\u4e07\u5186"], ["R9_510_650", "\u7d04510\u301c650\u4e07\u5186"], ["R9_370_510", "\u7d04370\u301c510\u4e07\u5186"], ["R9_260_370", "\u7d04260\u301c370\u4e07\u5186"], ["R9_200_260", "\u7d04200\u301c260\u4e07\u5186"], ["R9_UNDER_200", "\u7d04200\u4e07\u5186\u4ee5\u4e0b"], ["R9_LOW_INCOME_II", "\u4f4e\u6240\u5f97\u8005\u2161\uff08\u4f4f\u6c11\u7a0e\u975e\u8ab2\u7a0e\u4e16\u5e2f\uff09"], ["R9_LOW_INCOME_I", "\u4f4e\u6240\u5f97\u8005\u2160\uff08\u4f4f\u6c11\u7a0e\u975e\u8ab2\u7a0e\u4e16\u5e2f\u30fb\u4f4e\u6240\u5f97\uff09"]], "under70": [["R9_1650_PLUS", "\u7d041,650\u4e07\u5186\u4ee5\u4e0a"], ["R9_1410_1650", "\u7d041,410\u301c1,650\u4e07\u5186"], ["R9_1160_1410", "\u7d041,160\u301c1,410\u4e07\u5186"], ["R9_1040_1160", "\u7d041,040\u301c1,160\u4e07\u5186"], ["R9_950_1040", "\u7d04950\u301c1,040\u4e07\u5186"], ["R9_770_950", "\u7d04770\u301c950\u4e07\u5186"], ["R9_650_770", "\u7d04650\u301c770\u4e07\u5186"], ["R9_510_650", "\u7d04510\u301c650\u4e07\u5186"], ["R9_370_510", "\u7d04370\u301c510\u4e07\u5186"], ["R9_260_370", "\u7d04260\u301c370\u4e07\u5186"], ["R9_200_260", "\u7d04200\u301c260\u4e07\u5186"], ["R9_UNDER_200", "\u7d04200\u4e07\u5186\u4ee5\u4e0b"], ["R9_EXEMPT_UNDER70", "\u975e\u8ab2\u7a0e\uff0870\u6b73\u672a\u6e80\uff09"]]}} || {};
+// xolair table provided by server: list of rows with numeric fields
+window.XOLAIR_TABLE = [{"dose_mg": 150, "drug": "Xolair", "ige_max": 100.0, "ige_min": 30.0, "interval_weeks": 4, "weight_max": 60.0, "weight_min": 30.0}, {"dose_mg": 150, "drug": "Xolair", "ige_max": 100.0, "ige_min": 30.0, "interval_weeks": 4, "weight_max": 70.0, "weight_min": 60.0}, {"dose_mg": 150, "drug": "Xolair", "ige_max": 100.0, "ige_min": 30.0, "interval_weeks": 4, "weight_max": 90.0, "weight_min": 70.0}, {"dose_mg": 300, "drug": "Xolair", "ige_max": 100.0, "ige_min": 30.0, "interval_weeks": 4, "weight_max": 150.0, "weight_min": 90.0}, {"dose_mg": 300, "drug": "Xolair", "ige_max": 200.0, "ige_min": 100.0, "interval_weeks": 4, "weight_max": 60.0, "weight_min": 30.0}, {"dose_mg": 300, "drug": "Xolair", "ige_max": 200.0, "ige_min": 100.0, "interval_weeks": 4, "weight_max": 70.0, "weight_min": 60.0}, {"dose_mg": 300, "drug": "Xolair", "ige_max": 200.0, "ige_min": 100.0, "interval_weeks": 4, "weight_max": 90.0, "weight_min": 70.0}, {"dose_mg": 225, "drug": "Xolair", "ige_max": 200.0, "ige_min": 100.0, "interval_weeks": 4, "weight_max": 150.0, "weight_min": 90.0}, {"dose_mg": 300, "drug": "Xolair", "ige_max": 300.0, "ige_min": 200.0, "interval_weeks": 4, "weight_max": 60.0, "weight_min": 30.0}, {"dose_mg": 225, "drug": "Xolair", "ige_max": 300.0, "ige_min": 200.0, "interval_weeks": 4, "weight_max": 70.0, "weight_min": 60.0}, {"dose_mg": 225, "drug": "Xolair", "ige_max": 300.0, "ige_min": 200.0, "interval_weeks": 4, "weight_max": 90.0, "weight_min": 70.0}, {"dose_mg": 300, "drug": "Xolair", "ige_max": 300.0, "ige_min": 200.0, "interval_weeks": 4, "weight_max": 150.0, "weight_min": 90.0}, {"dose_mg": 225, "drug": "Xolair", "ige_max": 400.0, "ige_min": 300.0, "interval_weeks": 2, "weight_max": 60.0, "weight_min": 30.0}, {"dose_mg": 225, "drug": "Xolair", "ige_max": 400.0, "ige_min": 300.0, "interval_weeks": 2, "weight_max": 70.0, "weight_min": 60.0}, {"dose_mg": 300, "drug": "Xolair", "ige_max": 400.0, "ige_min": 300.0, "interval_weeks": 2, "weight_max": 90.0, "weight_min": 70.0}, {"dose_mg": 300, "drug": "Xolair", "ige_max": 500.0, "ige_min": 400.0, "interval_weeks": 2, "weight_max": 60.0, "weight_min": 30.0}, {"dose_mg": 300, "drug": "Xolair", "ige_max": 500.0, "ige_min": 400.0, "interval_weeks": 2, "weight_max": 70.0, "weight_min": 60.0}, {"dose_mg": 375, "drug": "Xolair", "ige_max": 500.0, "ige_min": 400.0, "interval_weeks": 2, "weight_max": 90.0, "weight_min": 70.0}, {"dose_mg": 300, "drug": "Xolair", "ige_max": 600.0, "ige_min": 500.0, "interval_weeks": 2, "weight_max": 60.0, "weight_min": 30.0}, {"dose_mg": 375, "drug": "Xolair", "ige_max": 600.0, "ige_min": 500.0, "interval_weeks": 2, "weight_max": 70.0, "weight_min": 60.0}, {"dose_mg": 375, "drug": "Xolair", "ige_max": 700.0, "ige_min": 600.0, "interval_weeks": 2, "weight_max": 60.0, "weight_min": 30.0}] || [];
+document.addEventListener('DOMContentLoaded', function(){
+  const systemEl = document.getElementById('system_version');
+  const incomeSel = document.getElementById('income_category_select');
+  const ageEl = document.getElementById('age_group');
+
+  function rebuildIncomeOptions(sys, age){
+    const list = (INCOME_MAP[sys] && INCOME_MAP[sys][age]) || [];
+    // clear
+    incomeSel.innerHTML = '';
+    list.forEach(function(pair){
+      const code = pair[0];
+      const label = pair[1] || '';
+      const opt = document.createElement('option');
+      opt.value = code;
+      opt.text = label ? (code + ' （' + label + '）') : code;
+      incomeSel.appendChild(opt);
+    });
+  }
+
+  function onSelectionChange(){
+    const sys = systemEl.value;
+    const age = ageEl.value;
+    rebuildIncomeOptions(sys, age);
+  }
+
+  if(systemEl){ systemEl.addEventListener('change', onSelectionChange); }
+  if(ageEl){ ageEl.addEventListener('change', onSelectionChange); }
+  // initial populate
+  onSelectionChange();
+  // restore selected income if server provided one
+  const SELECTED_INCOME = '';
+  if(SELECTED_INCOME){
+    // small delay to ensure options populated
+    setTimeout(function(){
+      try{ incomeSel.value = SELECTED_INCOME; }catch(e){}
+    }, 0);
+  }
+});
+</script>
+<script>
+// Primary / Add-on logic: disable LAMA when primary is Triple
+function onPrimaryChange(){
+  const p = document.getElementById('primary_drug_select');
+  const l = document.getElementById('lama_drug_select');
+  const helper = document.getElementById('lama_helper');
+  if(!p || !l) return;
+  // when multiple primary options may be selected, disable LAMA if any selected is Triple
+  let anyTriple = false;
+  for(let i=0;i<p.options.length;i++){
+    const opt = p.options[i];
+    if(!opt.selected) continue;
+    const cls = (opt.dataset && opt.dataset.class) ? (opt.dataset.class || '') : '';
+    if(cls && cls.toLowerCase() === 'triple'){
+      anyTriple = true; break;
+    }
+  }
+  if(anyTriple){
+    l.value = '';
+    l.disabled = true;
+    if(helper) helper.style.display = 'inline';
+  } else {
+    l.disabled = false;
+    if(helper) helper.style.display = 'none';
+  }
+  try{ if(typeof updateOralSum === 'function') updateOralSum(); }catch(e){}
+}
+document.addEventListener('DOMContentLoaded', function(){
+  const p = document.getElementById('primary_drug_select');
+  if(p){ p.addEventListener('change', onPrimaryChange); }
+  // initial run
+  onPrimaryChange();
+});
+</script>
+<script>
+// Oral drugs preview: sum weekly prices from multi-select
+function updateOralSum(){
+  const els = document.querySelectorAll('input[name="oral_drug_ids"]');
+  const el = document.getElementById('oral_weekly_sum');
+  if(!els || !el) return;
+  let sum = 0;
+  els.forEach(function(cb){
+    if(cb.checked){
+      const w = Number(cb.dataset.weekly || 0);
+      sum += isNaN(w) ? 0 : w;
+    }
+  });
+  // include selected inhaled primary drugs
+  try{
+    const psel = document.getElementById('primary_drug_select');
+    if(psel){
+      for(let i=0;i<psel.options.length;i++){
+        const opt = psel.options[i];
+        if(opt.selected){ sum += Number(opt.dataset.weekly || 0) || 0; }
+      }
+    }
+  }catch(e){}
+  // include selected LAMA
+  try{
+    const lsel = document.getElementById('lama_drug_select');
+    if(lsel && lsel.selectedIndex>=0){ const opt = lsel.options[lsel.selectedIndex]; sum += Number(opt.dataset.weekly || 0) || 0; }
+  }catch(e){}
+  // include legacy existing_old_select selections
+  try{
+    const eos = document.getElementById('existing_old_select');
+    if(eos){ for(let i=0;i<eos.options.length;i++){ const o = eos.options[i]; if(o.selected){ sum += Number(o.dataset.weekly || 0) || 0; } } }
+  }catch(e){}
+  el.textContent = sum;
+}
+document.addEventListener('DOMContentLoaded', function(){
+  const els = document.querySelectorAll('input[name="oral_drug_ids"]');
+  els.forEach(function(cb){ cb.addEventListener('change', updateOralSum); });
+  // watch inhaled selects too
+  try{ const p = document.getElementById('primary_drug_select'); if(p) p.addEventListener('change', updateOralSum); }catch(e){}
+  try{ const l = document.getElementById('lama_drug_select'); if(l) l.addEventListener('change', updateOralSum); }catch(e){}
+  try{ const eos = document.getElementById('existing_old_select'); if(eos) eos.addEventListener('change', updateOralSum); }catch(e){}
+  updateOralSum();
+});
+</script>
+
+<!-- Ensure checkboxes reflect server-selected values (override browser state) -->
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  try{
+    const selected = [];
+    const boxes = document.querySelectorAll('input[name="oral_drug_ids"]');
+    boxes.forEach(function(cb){
+      try{ cb.checked = Array.isArray(selected) && selected.indexOf(cb.value) !== -1; }catch(e){}
+    });
+    // refresh sum
+    try{ if(typeof updateOralSum === 'function') updateOralSum(); }catch(e){}
+  }catch(e){/* ignore */}
+});
+</script>
+<script>
+// Auto-fit select elements to the longest option text
+function adjustSelectWidths(){
+  // create a measuring span
+  let meas = document.getElementById('__select_width_measure');
+  if(!meas){
+    meas = document.createElement('span');
+    meas.id = '__select_width_measure';
+    meas.style.position = 'absolute';
+    meas.style.left = '-9999px';
+    meas.style.top = '-9999px';
+    meas.style.whiteSpace = 'nowrap';
+    meas.style.visibility = 'hidden';
+    document.body.appendChild(meas);
+  }
+
+  const selects = Array.from(document.querySelectorAll('select'));
+  selects.forEach(function(sel){
+    try{
+      // Skip selects that explicitly opt-out
+      if(sel.dataset && sel.dataset.noFit && sel.dataset.noFit === '1') return;
+
+      let maxW = 0;
+      for(let i=0;i<sel.options.length;i++){
+        const opt = sel.options[i];
+        // use option text as shown (trim)
+        const txt = (opt.text || '').trim();
+        if(!txt) continue;
+        meas.textContent = txt;
+        const w = meas.offsetWidth;
+        if(w > maxW) maxW = w;
+      }
+
+      if(maxW <= 0) return;
+      // add room for select padding + dropdown arrow
+      const extra = sel.multiple || (sel.size && Number(sel.size) > 1) ? 60 : 48;
+      let desired = maxW + extra;
+      // clamp for very large values to keep layout sane
+      const MIN = 140;
+      const MAX = 520;
+      if(desired < MIN) desired = MIN;
+      if(desired > MAX) desired = MAX;
+      sel.style.width = desired + 'px';
+      sel.style.minWidth = MIN + 'px';
+      sel.style.maxWidth = MAX + 'px';
+    }catch(e){ /* ignore measurement errors */ }
+  });
+}
+
+// run on load and when viewport changes
+document.addEventListener('DOMContentLoaded', function(){
+  try{ adjustSelectWidths(); }catch(e){}
+  window.addEventListener('resize', function(){ try{ adjustSelectWidths(); }catch(e){} });
+  // watch for option changes and re-run adjust
+  try{
+    const obs = new MutationObserver(function(){ adjustSelectWidths(); });
+    document.querySelectorAll('select').forEach(function(s){ obs.observe(s, { childList:true, subtree:true }); });
+  }catch(e){}
+});
+</script>
+<script>
+// Toggle visibility of taxable income field when medical deduction checkbox changes
+document.addEventListener('DOMContentLoaded', function(){
+  try{
+    const cb = document.getElementById('use_medical_deduction');
+    const field = document.getElementById('taxable_income_field');
+    if(!cb || !field) return;
+    function refresh(){
+      try{
+        if(cb.checked){ field.style.display = 'block'; }
+        else { field.style.display = 'none'; }
+      }catch(e){}
+    }
+    cb.addEventListener('change', refresh);
+    // initial
+    refresh();
+  }catch(e){/* ignore */}
+});
+</script>
+</body>
+</html>

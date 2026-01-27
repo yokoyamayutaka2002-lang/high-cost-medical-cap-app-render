@@ -1,0 +1,48 @@
+<!doctype html>
+<!-- DEMO SAFE (clean): meta/style/script/属性にプレースホルダは含まれません -->
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>デモ（クリーン）: 医療費補助</title>
+  <style>
+    body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans JP', sans-serif; margin:16px; color:#111; }
+    .container { max-width:760px; margin:0 auto; padding:12px; background:#fff; }
+    .header { font-size:20px; margin-bottom:8px; }
+    .table { width:100%; border-collapse:collapse; margin-top:12px; }
+    .table td, .table th { padding:8px; border:1px solid #ddd; text-align:left; }
+    .price { text-align:right; font-weight:600; }
+    .small { font-size:13px; color:#666; }
+    .button { padding:8px 12px; background:#0066cc; color:#fff; border:none; border-radius:4px; cursor:pointer; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">医療費補助 デモ（クリーン版）</div>
+    <div class="small">表示用プレースホルダは本文のテキストにのみ使用しています。</div>
+
+    <table class="table" aria-label="費用">
+      <thead><tr><th>項目</th><th class="price">金額</th></tr></thead>
+      <tbody>
+        <tr><td>薬剤A</td><td class="price">¥{AMOUNT}</td></tr>
+        <tr><td>薬剤B</td><td class="price">¥{AMOUNT}</td></tr>
+        <tr><td>合計</td><td class="price">¥{AMOUNT}</td></tr>
+      </tbody>
+    </table>
+
+    <div style="margin-top:12px;">
+      <button class="button" id="demo-calc">合計を更新</button>
+    </div>
+
+    <div class="small" style="margin-top:10px;">このファイルはクリーンなデモ版です。元ファイルを置き換えますか？</div>
+  </div>
+
+  <script>
+    // 最小限の UI 制御。スクリプト内にプレースホルダは含めていません。
+    document.getElementById('demo-calc').addEventListener('click', function(){
+      const nodes = document.querySelectorAll('.price');
+      nodes.forEach((el, i) => { el.textContent = '¥' + ((i + 1) * 11111).toLocaleString(); });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+drug_id,drug_name,strength,dosage_form
+THEO_XU_100,テオフィリン徐放U錠,100mg,錠
+THEO_XU_200,テオフィリン徐放U錠,200mg,錠
+THEO_XU_400,テオフィリン徐放U錠,400mg,錠
+MONTE_5,モンテルカスト錠,5mg,錠
+MONTE_10,モンテルカスト錠,10mg,錠
+PRANL_225,プランルカスト錠,225mg,錠

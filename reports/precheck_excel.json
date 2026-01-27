@@ -1,0 +1,12 @@
+{
+  "status": "pass",
+  "errors": [],
+  "warnings": [
+    {
+      "type": "REVISION_NOT_FOUND",
+      "message": "Could not find revision date in known candidates"
+    }
+  ],
+  "meta": {},
+  "checked_at": "2026-01-03T10:06:30.403933"
+}

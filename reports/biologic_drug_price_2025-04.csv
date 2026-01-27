@@ -1,0 +1,8 @@
+exact_item_name,price_yen,source_excel,sheet,row,class,route
+テゼスパイア皮下注２１０ｍｇペン,170987,data\source_excel\mhlw_drug_price_injection_2025-04.xlsx,ＨＰ用,535,biologic,injection
+ヌーカラ皮下注１００ｍｇペン,159891,data\source_excel\mhlw_drug_price_injection_2025-04.xlsx,ＨＰ用,529,biologic,injection
+ファセンラ皮下注３０ｍｇペン,351731,data\source_excel\mhlw_drug_price_injection_2025-04.xlsx,ＨＰ用,533,biologic,injection
+デュピクセント皮下注３００ｍｇペン,53659,data\source_excel\mhlw_drug_price_injection_2025-04.xlsx,ＨＰ用,2593,biologic,injection
+ゾレア皮下注７５ｍｇペン,11927,data\source_excel\mhlw_drug_price_injection_2025-04.xlsx,ＨＰ用,525,biologic,injection
+ゾレア皮下注１５０ｍｇペン,21830,data\source_excel\mhlw_drug_price_injection_2025-04.xlsx,ＨＰ用,526,biologic,injection
+ゾレア皮下注３００ｍｇペン,40091,data\source_excel\mhlw_drug_price_injection_2025-04.xlsx,ＨＰ用,527,biologic,injection

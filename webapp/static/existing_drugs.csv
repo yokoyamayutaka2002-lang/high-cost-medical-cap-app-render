@@ -1,0 +1,5 @@
+drug_id,drug_name,weekly_cost_yen,notes
+ics_laba,ICS/LABA配合剤,1200,標準的吸入治療
+laba_lama,LAMA/LABA配合剤,1500,COPD併用
+lti,LTRA,300,モンテルカスト等
+theophylline,テオフィリン,200,

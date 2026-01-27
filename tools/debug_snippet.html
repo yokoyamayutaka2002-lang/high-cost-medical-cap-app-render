@@ -1,0 +1,76 @@
+付加給付調整後（緑） */
+    .cost-table .benefit-row th,
+    .cost-table .benefit-row td {
+      background-color: #e8f7ef;
+      font-weight: 600;
+    }
+
+    /* 差額（グレー） - 再-declare to ensure precedence */
+    .cost-table .diff-row th,
+    .cost-table .diff-row td {
+      background-color: #f2f2f2;
+      color: #333;
+      font-weight: 700;
+    }
+
+    /* 医療費控除・税・最終負担（ピンク） */
+    .cost-table .deduction-row th,
+    .cost-table .deduction-row td {
+      background-color: #fdeaea;
+      color: #8a2d2d;
+    }
+
+    /* 優先順位メモ（差額 > 控除 > 給付 > 元費用） - ensure rules above are applied in that order */
+  </style>
+  <style>
+    /* (card-style input-summary removed per UI change) */
+    /* Text summary for PDF/export (plain text block) */
+      .calc-summary {
+        margin: 15px 0 25px 0;
+        padding: 10px 15px;
+        background: #ffffff;
+        border: 1px solid #ddd;
+        font-size: 14px;
+        line-height: 1.6;
+      }
+    .calc-summary p { margin: 4px 0; }
+  </style>
+</head>
+<body>
+  <h1>高額療養費シミュレータ</h1>
+  <form method="post" action="/calculate">
+    <fieldset class="card">
+      <legend>生物学的製剤</legend>
+      <label>薬剤: <select id="drug_id" name="drug_id">
+        
+        
+          
+            <option value="dupixent_300" selected>dupixent_300 - デュピクセント皮下注300mgペン</option>
+          
+        
+          
+            <option value="tezspire" >tezspire - テゼスパイア皮下注210mgペン</option>
+          
+        
+          
+            <option value="nucala" >nucala - ヌーカラ皮下注100mgペン</option>
+          
+        
+          
+            <option value="fasenra" >fasenra - ファセンラ皮下注30mgペン</option>
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+          <option value="xolair" >xolair - ゾレア（IgE/体重で投与量が決まります）</option>
+        
+      </select></label>
+      <div id="xolair_panel" style="display:none;margin-top:8px">
+        <label>Xolair 用 IgE (IU/mL): <input id="xolair_ige" name="xolair_ige" type="number" min="0" step="1"/></label>
+        <label style="

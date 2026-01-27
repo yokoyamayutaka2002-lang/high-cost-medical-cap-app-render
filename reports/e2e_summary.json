@@ -1,0 +1,9 @@
+{
+  "status": "pass",
+  "excel_file": "data\\source_excel\\mhlw_drug_price_oral_2025-04.xlsx",
+  "new_drugs": 85,
+  "price_change_warnings": 0,
+  "price_change_errors": 0,
+  "unmapped_rows": 6936,
+  "possible_matches": 0
+}
