@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>高額療養費シミュレーション（印刷用）</title>
+  <style>
+    /* 基本フォントとレイアウト（画面より印刷安定性優先） */
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+      color: #000;
+      font-size: 12px;
+      margin: 0;
+      padding: 8mm;
+      background: #fff;
+    }
+
+    h2 { margin: 6px 0 8px 0; font-size: 16px; }
+    h3 { margin: 10px 0 6px 0; font-size: 14px; }
+
+    .section { margin-bottom: 8px; }
+    .kv { display: inline-block; margin-right: 18px; white-space: nowrap; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    th, td { border: 1px solid #000; padding: 4px 6px; text-align: right; white-space: nowrap; }
+    th { background: #f0f0f0; text-align: center; }
+    .text-left { text-align: left; }
+
+    /* 印刷専用ルール */
+    @page { size: A4 landscape; margin: 12mm; }
+
+    @media print {
+      html, body { width: 297mm; height: 210mm; }
+
+      /* Page 1: result-summary の後で改ページ */
+      .result-summary { page-break-after: always; break-after: page; }
+
+      /* Page 2: prescription-schedule を新しいページで開始 */
+      .prescription-schedule { page-break-before: always; break-before: page; }
+
+      /* 表や行の途中で切られないようにする */
+      table, tr { page-break-inside: avoid; break-inside: avoid; }
+      thead { display: table-header-group; }
+    }
+
+  </style>
+</head>
+<body>
+
+  <!-- Page 1: 結果サマリ + 比較表 -->
+  <div class="result-summary">
+    <h2>高額療養費シミュレーション 結果サマリ</h2>
+
+    <div class="section">
+      <div class="kv"><strong>開始日：</strong>{{ start_date }}</div>
+      <div class="kv"><strong>制度：</strong>{{ system_version }}</div>
+      <div class="kv"><strong>年齢区分：</strong>{{ age_group }}</div>
+      <div class="kv"><strong>所得区分：</strong>{{ income_category }}</div>
+      <div class="kv"><strong>自己負担割合：</strong>{{ copay_rate }}%</div>
+    </div>
+
+    <div class="section">
+      <div class="kv"><strong>課税所得：</strong>{{ taxable_income }}円</div>
+      <div class="kv"><strong>付加給付制度：</strong>月額 {{ additional_benefit }} 円</div>
+    </div>
+
+    <!-- 年額・月額比較表（サーバー側で生成された HTML をそのまま出力） -->
+    <div class="section">
+      {{ comparison_table_html | safe }}
+    </div>
+
+  </div>
+
+  <!-- Page 2: 処方スケジュール（存在する場合のみ） -->
+  {% if prescription_schedule %}
+  <div class="prescription-schedule">
+    <h2>処方スケジュール</h2>
+    <div class="section">
+      {{ prescription_schedule_html | safe }}
+    </div>
+  </div>
+  {% endif %}
+
+</body>
+</html>

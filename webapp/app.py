@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, abort, session
+import os
 from pathlib import Path
 import csv
 from datetime import datetime, timedelta
@@ -10,6 +11,8 @@ from src.biologic_schedule import build_prescription_schedule
 import unicodedata
 
 app = Flask(__name__)
+# Use env var for secret key, with a dev fallback
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'dev-fallback')
 
 # Jinja filter to format numbers as Japanese yen with comma separators
 def _format_yen(val):
@@ -636,6 +639,17 @@ def index():
                            controllers=controllers, lamas=lamas, oral_drugs=oral_drugs,
                            system_versions=['R7','R8','R9'], income_map=build_income_map(), selected_system='R9', selected_age_group='under70', selected_income_category='',
                            include_existing=True, selected_oral_ids=[], xolair_table=xolair_table, has_xolair=has_xolair)
+
+
+@app.route('/print')
+def print_view():
+    from flask import session as _session
+    summary = _session.get('pdf_summary')
+
+    if not summary:
+        return "印刷データがありません。先に計算を実行してください。", 400
+
+    return render_template('print.html', **summary)
 
 @app.route('/calculate', methods=['POST'])
 def calculate():
@@ -2109,67 +2123,149 @@ def calculate():
             if od:
                 existing_treatments.append({'display_name': od.get('display_name') or oid, 'weekly_cost_yen': int(od.get('weekly_price') or 0)})
 
-    return render_template('index.html',
-                           drugs=load_drugs(),
-                           existing_drugs=load_existing_drugs(),
-                           controllers=controllers,
-                           lamas=lamas,
-                           oral_drugs=oral_drugs,
-                           system_versions=['R7','R8','R9'],
-                           income_map=build_income_map(),
-                           selected_system=selected_system,
-                           selected_age_group=age_group,
-                           selected_income_category=raw_income,
-                           results=True,
-                           include_existing=include_existing,
-                           existing_drug_name=existing_drug_name,
-                           existing_only_annual=existing_only_annual,
-                           existing_only_monthly=round(existing_only_monthly),
-                           annual_existing_only=existing_only_annual,
-                           annual_biologic=period_aggregates.get('calendar_start', {}).get('biologic_plus_annual', 0),
-                           annual_difference=difference,
-                           months=months_sorted,
-                           start_date=start_date,
-                           qty2=qty2,
-                           qty3=qty3,
-                           prescription_schedule=biologic_schedule,
-                           selected_drug=selected_drug,
-                           days_per_unit=days_per_unit,
-                           period_aggregates=period_aggregates,
-                           # preserve selected existing-mode and inhaled/oral selections for UI
-                           selected_existing_mode=form.get('existing_mode') or '',
-                           selected_primary_ids=form.getlist('primary_drug_ids') if hasattr(form, 'getlist') else ([] if not form.get('primary_drug_id') else [form.get('primary_drug_id')]),
-                           selected_lama_id=form.get('lama_drug_id') or '',
-                           selected_oral_ids=selected_oral_ids,
-                           selected_existing_drug_ids=form.getlist('existing_drug_ids') if hasattr(form, 'getlist') else [],
-                           selected_biologic_name=selected_biologic_name,
-                           xolair_table=load_xolair_table_for_ui(),
-                           has_xolair=has_xolair,
-                           xolair_display=xolair_display,
-                           # input summary fields for UI display (template-only)
-                           biologic_name=(selected_biologic_name or selected_drug),
-                           base_treatment=base_treatment,
-                           dose2=qty2,
-                           dose3=qty3,
-                           system=selected_system,
-                           age_group=age_group,
-                           age_label=age_label,
-                           income_class=income_category,
-                           income_display=income_display,
-                           copay_rate_percent=copay_rate_percent,
-                           taxable_income=taxable_income,
-                           benefit_monthly=(subsidy_cap or 0),
-                           benefit_enabled=use_subsidy,
-                           medical_deduction_enabled=use_md,
-                           # high-cost applicability: True if any month raw_self_pay >= monthly_limit
-                           high_cost_applicable=(lambda monthly_map, limit_info: any(int(v.get('raw_self_pay') or 0) >= int(limit_info.get('monthly_limit') or 0) for v in (monthly_map.values() if isinstance(monthly_map, dict) else [])))(monthly, limit_info),
-                           selected_biologics_summary=selected_biologics_summary,
-                           selected_existing_summary=selected_existing_summary,
-                           selected_biologic=selected_biologic,
-                           existing_treatments=existing_treatments,
-                           year1=year1,
-                           year2=year2,
-                           )
+    # Build the context dict used for rendering the index template. Do not
+    # change calculation results or template context values.
+    ctx = dict(
+        drugs=load_drugs(),
+        existing_drugs=load_existing_drugs(),
+        controllers=controllers,
+        lamas=lamas,
+        oral_drugs=oral_drugs,
+        system_versions=['R7','R8','R9'],
+        income_map=build_income_map(),
+        selected_system=selected_system,
+        selected_age_group=age_group,
+        selected_income_category=raw_income,
+        results=True,
+        include_existing=include_existing,
+        existing_drug_name=existing_drug_name,
+        existing_only_annual=existing_only_annual,
+        existing_only_monthly=round(existing_only_monthly),
+        annual_existing_only=existing_only_annual,
+        annual_biologic=period_aggregates.get('calendar_start', {}).get('biologic_plus_annual', 0),
+        annual_difference=difference,
+        months=months_sorted,
+        start_date=start_date,
+        qty2=qty2,
+        qty3=qty3,
+        prescription_schedule=biologic_schedule,
+        selected_drug=selected_drug,
+        days_per_unit=days_per_unit,
+        period_aggregates=period_aggregates,
+        # preserve selected existing-mode and inhaled/oral selections for UI
+        selected_existing_mode=form.get('existing_mode') or '',
+        selected_primary_ids=form.getlist('primary_drug_ids') if hasattr(form, 'getlist') else ([] if not form.get('primary_drug_id') else [form.get('primary_drug_id')]),
+        selected_lama_id=form.get('lama_drug_id') or '',
+        selected_oral_ids=selected_oral_ids,
+        selected_existing_drug_ids=form.getlist('existing_drug_ids') if hasattr(form, 'getlist') else [],
+        selected_biologic_name=selected_biologic_name,
+        xolair_table=load_xolair_table_for_ui(),
+        has_xolair=has_xolair,
+        xolair_display=xolair_display,
+        # input summary fields for UI display (template-only)
+        biologic_name=(selected_biologic_name or selected_drug),
+        base_treatment=base_treatment,
+        dose2=qty2,
+        dose3=qty3,
+        system=selected_system,
+        age_group=age_group,
+        age_label=age_label,
+        income_class=income_category,
+        income_display=income_display,
+        copay_rate_percent=copay_rate_percent,
+        taxable_income=taxable_income,
+        benefit_monthly=(subsidy_cap or 0),
+        benefit_enabled=use_subsidy,
+        medical_deduction_enabled=use_md,
+        # high-cost applicability: True if any month raw_self_pay >= monthly_limit
+        high_cost_applicable=(lambda monthly_map, limit_info: any(int(v.get('raw_self_pay') or 0) >= int(limit_info.get('monthly_limit') or 0) for v in (monthly_map.values() if isinstance(monthly_map, dict) else [])))(monthly, limit_info),
+        selected_biologics_summary=selected_biologics_summary,
+        selected_existing_summary=selected_existing_summary,
+        selected_biologic=selected_biologic,
+        existing_treatments=existing_treatments,
+        year1=year1,
+        year2=year2,
+    )
+
+    # --- Persist printable summary using existing in-memory data (no regex) ---
+    try:
+        # Prefer explicit HTML fragment variables if present in locals(), else empty string
+        comparison_table_html = locals().get('comparison_table_html') or ''
+        prescription_schedule_html = locals().get('prescription_schedule_html') or ''
+
+        # prescription schedule object: prefer explicit name then biologic_schedule
+        if 'prescription_schedule' in locals():
+            prescription_schedule_value = locals().get('prescription_schedule')
+        elif 'biologic_schedule' in locals():
+            prescription_schedule_value = locals().get('biologic_schedule')
+        else:
+            prescription_schedule_value = None
+
+        # income display/group
+        income_group_value = locals().get('income_display') or locals().get('raw_income') or locals().get('income_category') or ''
+
+        # copay rate percent: prefer copay_rate_percent, else compute from burden_rate/burden_ratio
+        copay_value = None
+        if 'copay_rate_percent' in locals():
+            copay_value = locals().get('copay_rate_percent') or 0
+        else:
+            try:
+                br = locals().get('burden_rate') if 'burden_rate' in locals() else (locals().get('br_raw') if 'br_raw' in locals() else locals().get('burden_ratio'))
+                copay_value = int(round(float(br) * 100)) if br is not None else 0
+            except Exception:
+                copay_value = 0
+
+        # taxable income
+        taxable_income_value = locals().get('taxable_income')
+        if taxable_income_value is None:
+            try:
+                taxable_income_value = int(float(locals().get('ti_raw', 0)))
+            except Exception:
+                taxable_income_value = 0
+
+        # additional benefit
+        if 'additional_benefit' in locals():
+            additional_benefit_value = locals().get('additional_benefit') or 0
+        else:
+            try:
+                additional_benefit_value = int(locals().get('subsidy_cap') or 0) if locals().get('use_subsidy') else 0
+            except Exception:
+                additional_benefit_value = 0
+
+        # start/system/age
+        start_date_value = locals().get('start_date') or ''
+        system_value = locals().get('selected_system') or locals().get('system') or ''
+        age_group_value = locals().get('age_group') or ''
+
+        app.config['_LAST_PDF_SUMMARY'] = {
+            'start_date': start_date_value,
+            'system_version': (locals().get('system') or system_value),
+            'age_group': age_group_value,
+            'income_category': (locals().get('income_group') or income_group_value),
+            'copay_rate': (locals().get('copay_rate_percent') if 'copay_rate_percent' in locals() else copay_value),
+            'taxable_income': taxable_income_value,
+            'additional_benefit': (locals().get('additional_benefit') if 'additional_benefit' in locals() else additional_benefit_value),
+            # ensure these are strings (avoid Jinja silent-empty when None)
+            'comparison_table_html': (locals().get('comparison_table_html') or comparison_table_html) or '',
+            'prescription_schedule_html': (locals().get('prescription_schedule_html') or prescription_schedule_html) or '',
+        }
+        try:
+            # also persist into the user session for robust per-session storage
+            try:
+                session['pdf_summary'] = app.config['_LAST_PDF_SUMMARY']
+            except Exception:
+                # if session not available or fails, ignore
+                pass
+        except Exception:
+            pass
+    except Exception:
+        try:
+            app.config.setdefault('_LAST_PDF_SUMMARY', {})
+        except Exception:
+            pass
+
+    # Return the normal rendered index page (unchanged behaviour)
+    return render_template('index.html', **ctx)
 
 
 if __name__ == '__main__':

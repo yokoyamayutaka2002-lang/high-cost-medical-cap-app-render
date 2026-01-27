@@ -205,11 +205,36 @@
         .condition-summary .cs-row { gap:12px; }
         .calc-summary { padding:6px 8px; font-size:12px; }
       }
+      /* Print rules: moved to head and strengthened to ensure Chrome applies page breaks */
+      @media print {
+        /* Hide all content by default to ensure only the desired sections are printed */
+        body * { visibility: hidden !important; }
+
+        /* Reveal only result-summary and prescription-schedule (and their children) */
+        .result-summary, .result-summary *,
+        .prescription-schedule, .prescription-schedule * {
+          visibility: visible !important;
+        }
+
+        /* Ensure visible blocks are positioned correctly and preserve page-breaks */
+        .result-summary { position: relative !important; top: 0; left: 0; display: block !important; page-break-after: always; break-after: page; }
+        .prescription-schedule { position: relative !important; top: 0; left: 0; display: block !important; page-break-before: always; break-before: page; page-break-inside: avoid; break-inside: avoid; }
+
+        /* Hide interactive/input UI as a fallback (if present) */
+        .screen-only { display: none !important; visibility: hidden !important; }
+
+        /* Allow table content to flow and avoid row-splitting */
+        .table-responsive { overflow: visible !important; }
+        table { page-break-inside: avoid; break-inside: avoid; }
+        thead { display: table-header-group; }
+        tr { page-break-inside: avoid; }
+      }
   </style>
 </head>
 <body>
-  <h1>高額療養費シミュレータ</h1>
-  <form method="post" action="/calculate">
+  <div class="screen-only">
+  <h1 class="screen-only">高額療養費シミュレータ</h1>
+  <form id="calc_form" class="screen-only" method="post" action="/calculate">
     <fieldset class="card">
       <legend>生物学的製剤</legend>
       <label>薬剤: <select id="drug_id" name="drug_id">
@@ -343,13 +368,17 @@
 
     <div style="margin-top:12px"><button type="submit">計算実行</button></div>
   </form>
+  </div>
 
   {% if error_message %}
   <div class="card highlight"> <strong>エラー:</strong> {{ error_message }} </div>
   {% endif %}
 
   {% if results %}
-  <h2 id="result-section">結果</h2>
+  <h2 id="result-section">結果
+    <a href="/print" target="_blank" class="btn btn-secondary" style="margin-left:12px; font-size:0.95em; text-decoration:none;">印刷用表示</a>
+  </h2>
+  <div class="result-summary">
   <div class="calc-summary">
     <div class="condition-summary">
       <div class="cs-row">
@@ -488,12 +517,14 @@
   </div>
   {% if results %}
   {% endif %}
+  </div> {# .result-summary end #}
   
   
   {# 月別内訳: UI上の表示は不要になったため省略 #}
   {% endif %}
 
   {% if prescription_schedule %}
+  <div class="prescription-schedule">
   <h3>処方スケジュール</h3>
   {% if xolair_display %}
   <div style="margin:6px 0 10px 0; font-weight:600">{{ xolair_display }}</div>
@@ -534,6 +565,7 @@
       </tbody>
       </table>
     </div>
+  </div>
   </div>
   {% endif %}
 
@@ -994,3 +1026,20 @@ document.addEventListener('DOMContentLoaded', function(){
 {% endif %}
 </body>
 </html>
+<script>
+// Ensure system_version and income_category are sent: if empty, choose first option before submit.
+document.addEventListener('DOMContentLoaded', function(){
+  try{
+    const form = document.getElementById('calc_form');
+    const sys = document.getElementById('system_version');
+    const income = document.getElementById('income_category_select');
+    if(!form) return;
+    form.addEventListener('submit', function(e){
+      try{
+        if(sys && (!sys.value || sys.value.length===0) && sys.options && sys.options.length>0){ sys.value = sys.options[0].value; }
+        if(income && (!income.value || income.value.length===0) && income.options && income.options.length>0){ income.value = income.options[0].value; }
+      }catch(err){ /* ignore */ }
+    });
+  }catch(e){/* ignore */}
+});
+</script>
