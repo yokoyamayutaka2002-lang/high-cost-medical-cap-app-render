@@ -195,6 +195,16 @@
         line-height: 1.6;
       }
     .calc-summary p { margin: 4px 0; }
+      /* Compact, print-friendly condition summary (three rows) */
+      .condition-summary { display:flex; flex-direction:column; gap:6px; }
+      .condition-summary .cs-row { display:flex; gap:18px; align-items:center; flex-wrap:nowrap; }
+      .condition-summary .cs-item { display:flex; gap:6px; align-items:center; white-space:nowrap; }
+      /* Ensure print output remains compact and avoids unexpected line-height expansion */
+      @media print {
+        .condition-summary { gap:4px; }
+        .condition-summary .cs-row { gap:12px; }
+        .calc-summary { padding:6px 8px; font-size:12px; }
+      }
   </style>
 </head>
 <body>
@@ -341,23 +351,37 @@
   {% if results %}
   <h2 id="result-section">結果</h2>
   <div class="calc-summary">
-    <p><strong>開始日：</strong>{{ start_date or '—' }}</p>
-    <p><strong>制度：</strong>{{ system or selected_system or '' }}</p>
-    <p><strong>年齢区分：</strong>{{ age_label or (age_group or selected_age_group) }}</p>
-    <p><strong>所得区分：</strong>{{ income_display or income_class or selected_income_category or '' }}</p>
-    <p><strong>自己負担割合：</strong>{{ copay_rate_percent }}％</p>
-    {% if medical_deduction_enabled %}
-    <p><strong>課税所得：</strong>{{ taxable_income }}円</p>
-    {% endif %}
-    {% if benefit_enabled %}
-    <p><strong>付加給付制度：</strong>月額 {{ benefit_monthly or 0 }} 円</p>
-    {% endif %}
+    <div class="condition-summary">
+      <div class="cs-row">
+        <div class="cs-item"><strong>開始日：</strong><span>{{ start_date or '—' }}</span></div>
+        <div class="cs-item"><strong>制度：</strong><span>{{ system or selected_system or '' }}</span></div>
+        <div class="cs-item"><strong>自己負担割合：</strong><span>{{ copay_rate_percent }}％</span></div>
+      </div>
+      <div class="cs-row">
+        <div class="cs-item"><strong>年齢区分：</strong><span>{{ age_label or (age_group or selected_age_group) }}</span></div>
+        <div class="cs-item"><strong>所得区分：</strong><span>{{ income_display or income_class or selected_income_category or '' }}</span></div>
+      </div>
+      <div class="cs-row">
+        {% if medical_deduction_enabled %}
+        <div class="cs-item"><strong>課税所得：</strong><span>{{ taxable_income }}円</span></div>
+        {% else %}
+        <div class="cs-item"><strong>課税所得：</strong><span>—</span></div>
+        {% endif %}
+        {% if benefit_enabled %}
+        <div class="cs-item"><strong>付加給付制度：</strong><span>月額 {{ benefit_monthly or 0 }} 円</span></div>
+        {% else %}
+        <div class="cs-item"><strong>付加給付制度：</strong><span>—</span></div>
+        {% endif %}
+      </div>
+    </div>
     {% if high_cost_applicable is defined %}
       {% if high_cost_applicable %}
+        {#
         <div>
           <strong>高額療養費適用：</strong>
           <strong>可</strong>
         </div>
+        #}
       {% else %}
         <div>
           <strong>高額療養費適用：</strong>
@@ -369,7 +393,7 @@
   {% if selected_biologic or existing_treatments %}
   <hr>
   <div style="margin-top:12px">
-    <strong>治療内容</strong>
+    {# <strong>治療内容</strong> #}
 
     {% if selected_biologic %}
     <div style="margin-top:6px">
