@@ -1449,7 +1449,11 @@ def calculate():
     # Apply canonical monthly subsidy allocation (SSOT).
     # All per-month allocation logic lives in `src.biologic_monthly.apply_monthly_subsidy_to_monthly_map`.
     SUBSIDY_CAP_FIXED = globals().get('SUBSIDY_CAP_FIXED', 30000)
-    apply_monthly_subsidy_to_monthly_map(monthly, int(SUBSIDY_CAP_FIXED) if use_subsidy else None)
+    apply_monthly_subsidy_to_monthly_map(
+        monthly,
+        int(SUBSIDY_CAP_FIXED) if use_subsidy else None,
+        existing_weekly_cost_yen,
+    )
 
     # --- Debug logging for the requested case to prove where discrepancy occurred ---
     debug_case = (drug_id == 'dupixent_300' and start_date == sd.strftime('%Y-%m-%d') and income_category == 'R9_370_510')
@@ -2217,7 +2221,8 @@ def calculate():
         existing_annual=period_aggregates.get('calendar_start', {}).get('existing_total_self_pay_annual', int(existing_only_annual)),
         biologic_annual=period_aggregates.get('calendar_start', {}).get('biologic_annual', 0),
         biologic_with_subsidy_annual=period_aggregates.get('calendar_start', {}).get('biologic_with_subsidy_annual', 0),
-        annual_difference=difference,
+        # Ensure displayed difference uses canonical annual biologic - existing (SSOT)
+        annual_difference=annual_difference,
         months=months_sorted,
         start_date=start_date,
         qty2=qty2,
@@ -2339,6 +2344,132 @@ def calculate():
             pass
 
     # Return the normal rendered index page (unchanged behaviour)
+    # --- Display-time override: ensure template prescription_schedule uses monthly-derived events
+    try:
+        _prescription_events = []
+        if isinstance(monthly, dict):
+            for _m in sorted(monthly.keys()):
+                _prescription_events.extend(monthly[_m].get('events', []) or [])
+        # Attach these events for template display (contains pre_adjust_amount)
+        ctx['prescription_schedule'] = _prescription_events
+        # --- Display-only: compute per-event post-highcost (月次高額療養費適用) from pre_adjust_amount
+        try:
+            # determine per-month grouping
+            events_by_month = {}
+            for ev in _prescription_events:
+                try:
+                    d = ev.get('date')
+                    ym = d.strftime('%Y-%m') if hasattr(d, 'strftime') else str(d)[:7]
+                except Exception:
+                    ym = '0000-00'
+                events_by_month.setdefault(ym, []).append(ev)
+
+            # display-level many-times counter (separate from SSOT counters)
+            display_high_cost_count = 0
+            # fetch monthly caps from existing limit_info if available
+            try:
+                monthly_limit = int(limit_info.get('monthly_limit') or 0)
+            except Exception:
+                monthly_limit = 0
+            try:
+                many_limit = int(limit_info.get('monthly_limit_after_many') or 0) if limit_info.get('monthly_limit_after_many') else None
+            except Exception:
+                many_limit = None
+
+            # iterate months in chronological order according to monthly map if available
+            month_order = sorted(list(monthly.keys())) if isinstance(monthly, dict) else sorted(list(events_by_month.keys()))
+
+            for ym in month_order:
+                evs = events_by_month.get(ym, [])
+                if not evs:
+                    continue
+                # compute month total pre-adjust (biologic pre + existing 3割)
+                month_pre_total = int(sum(int(ev.get('pre_adjust_amount') or 0) for ev in evs))
+
+                # determine cap for this display-month (many-times rule applied to display totals)
+                if many_applicable and many_limit:
+                    if monthly_limit and month_pre_total >= monthly_limit:
+                        display_high_cost_count += 1
+                    if display_high_cost_count >= 4:
+                        cap = many_limit
+                    else:
+                        cap = monthly_limit
+                else:
+                    cap = monthly_limit
+
+                # Allocate the monthly high-cost cap to events in chronological order.
+                # Implementation note (single authoritative comment):
+                # - This is a display-only, month-scoped running-total allocation.
+                # - For each month, `running` accumulates the canonical
+                #   `pre_adjust_amount` of earlier events (per-spec).
+                # - For each event: pay = pre if running_before + pre <= cap else
+                #   max(0, cap - running_before). After computing pay, update
+                #   running by adding pre (not pay). This ensures cap is applied
+                #   against cumulative pre_adjust_amount as required.
+                running = 0
+                for ev in sorted(evs, key=lambda e: (e.get('date'), int(e.get('order') or 0))):
+                    # use pre_adjust_amount explicitly as the canonical source
+                    pre = int(ev.get('pre_adjust_amount') or 0)
+                    running_before = int(running)
+                    if cap and cap > 0:
+                        if running_before + pre <= int(cap):
+                            pay = int(pre)
+                        else:
+                            pay = int(max(0, int(cap) - running_before))
+                    else:
+                        pay = int(pre)
+                    # accumulate running by canonical pre_adjust_amount (per spec)
+                    running += int(pre)
+                    # Per request: display column `self_pay` must reflect the
+                    # high-cost-cap-applied value computed from pre_adjust_amount.
+                    # Do NOT change meaning of `pre_adjust_amount` itself.
+                    ev['post_highcost_self_pay'] = int(pay)
+                    # Safety: assign a display-only field used by templates.
+                    # Do NOT modify canonical `self_pay` here.
+                    ev['display_self_pay'] = int(pay)
+
+            # --- Display-only: apply additional benefit monthly cap as an UPPER LIMIT
+            try:
+                # subsidy_cap originates from form and represents a monthly cap (表示用)
+                try:
+                    cap_int = int(subsidy_cap) if (use_subsidy and subsidy_cap is not None) else None
+                except Exception:
+                    cap_int = None
+
+                # For each month, initialize remaining_cap and allocate sequentially
+                if cap_int is None:
+                    # No additional benefit cap -> display post_subsidy as post_highcost
+                    for ev in _prescription_events:
+                        try:
+                            ev['post_subsidy_self_pay'] = int(ev.get('post_highcost_self_pay') or 0)
+                        except Exception:
+                            ev['post_subsidy_self_pay'] = 0
+                else:
+                    # Process month-by-month in chronological order and decrement remaining cap
+                    for ym in sorted(events_by_month.keys()):
+                        remaining_cap = int(cap_int)
+                        evs_sorted = sorted(events_by_month.get(ym, []), key=lambda e: (e.get('date'), int(e.get('order') or 0)))
+                        for ev in evs_sorted:
+                            try:
+                                post_high = int(ev.get('post_highcost_self_pay') or 0)
+                            except Exception:
+                                post_high = 0
+                            if remaining_cap <= 0:
+                                ev['post_subsidy_self_pay'] = 0
+                            else:
+                                alloc = int(min(post_high, remaining_cap))
+                                ev['post_subsidy_self_pay'] = alloc
+                                remaining_cap -= alloc
+            except Exception:
+                # on any failure, leave events unchanged
+                pass
+        except Exception:
+            # on any failure, leave events unchanged
+            pass
+    except Exception:
+        # if anything goes wrong, keep existing ctx['prescription_schedule']
+        pass
+
     return render_template('index.html', **ctx)
 
 

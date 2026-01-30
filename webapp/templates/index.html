@@ -532,10 +532,10 @@
           <td style="text-align:left">{{ ev.date }}</td>
           <td style="text-align:center">{{ ev.qty }} {% if selected_drug and ('xolair' in selected_drug) %}回分{% else %}本{% endif %}</td>
           <td style="text-align:right">{{ days }}日 ({{ weeks }}週)</td>
-          <td style="text-align:right">{% if ev.get('raw_self') is not none %}¥{{ ev.get('raw_self') }}{% else %}—{% endif %}</td>
-          <td style="text-align:right">{% if ev.get('actual_payment') is not none %}¥{{ ev.get('actual_payment') }}{% else %}—{% endif %}</td>
+          <td style="text-align:right">{% if ev.get('pre_adjust_amount') is not none %}¥{{ ev.get('pre_adjust_amount') }}{% else %}¥0{% endif %}</td>
+          <td style="text-align:right">{% if ev.get('display_self_pay') is not none %}¥{{ ev.get('display_self_pay') }}{% else %}—{% endif %}</td>
           {% if benefit_enabled %}
-          <td style="text-align:right">{% if ev.get('display_post_subsidy_payment') is not none %}¥{{ ev.get('display_post_subsidy_payment') }}{% else %}—{% endif %}</td>
+          <td style="text-align:right">{% if ev.get('post_subsidy_self_pay') is not none %}¥{{ ev.get('post_subsidy_self_pay') }}{% else %}—{% endif %}</td>
           {% endif %}
         </tr>
         {% endfor %}
