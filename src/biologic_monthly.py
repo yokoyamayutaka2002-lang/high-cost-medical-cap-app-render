@@ -144,13 +144,18 @@ def apply_monthly_subsidy_to_monthly_map(monthly_map: Dict[str, Dict[str, Any]],
     Returns the same monthly_map with each event annotated and each month annotated
     with 'post_subsidy_self_pay'. Raises AssertionError on any allocation mismatch.
     """
+    # Per SSOT: subsidy is a MONTH-LEVEL cap. Do NOT apply event-level
+    # min(self_pay, subsidy_cap). Instead compute for each month:
+    #   month_self_pay = sum(event.self_pay)
+    #   month_post_subsidy = min(month_self_pay, subsidy_cap)
+    # and store month_post_subsidy into bucket['post_subsidy_self_pay'].
+    # Do NOT alter per-event canonical `self_pay` beyond ensuring it is int.
     for ym, bucket in monthly_map.items():
         evs = bucket.get('events') or []
 
-        # 1) Ensure canonical `self_pay` on each event
+        # 1) Ensure canonical `self_pay` on each event (int)
         for ev in evs:
             if 'self_pay' in ev and ev['self_pay'] is not None:
-                # preserve provided value but ensure it's an int (fail fast on bad data)
                 ev['self_pay'] = int(ev['self_pay'])
             else:
                 ev['self_pay'] = int(ev.get('actual_payment') or 0)
@@ -158,42 +163,15 @@ def apply_monthly_subsidy_to_monthly_map(monthly_map: Dict[str, Dict[str, Any]],
         # 2) month total
         month_total_self_pay = int(sum(int(ev.get('self_pay') or 0) for ev in evs))
 
-        # 3) compute post_subsidy_self_pay (SSOT monthly value)
+        # 3) compute post_subsidy_self_pay (month-level)
         if subsidy_cap is not None:
-            post_subsidy = int(min(month_total_self_pay, int(subsidy_cap)))
+            bucket['post_subsidy_self_pay'] = int(min(month_total_self_pay, int(subsidy_cap)))
         else:
-            post_subsidy = int(month_total_self_pay)
+            bucket['post_subsidy_self_pay'] = int(month_total_self_pay)
 
-        bucket['post_subsidy_self_pay'] = int(post_subsidy)
-
-        # 4) subsidy amount (amount reduced from patient responsibility)
-        subsidy_amount = int(max(0, month_total_self_pay - post_subsidy))
-
-        # 5) per-event distribution
-        if not evs:
-            # nothing to do
-            continue
-
-        if subsidy_amount == 0 or month_total_self_pay == 0:
-            for ev in evs:
-                ev['post_subsidy_payment'] = int(ev.get('self_pay') or 0)
-        else:
-            allocated = 0
-            for idx, ev in enumerate(evs):
-                sp = int(ev.get('self_pay') or 0)
-                if idx < len(evs) - 1:
-                    # proportional share of the total reduction
-                    alloc = int(round((sp * subsidy_amount) / float(month_total_self_pay))) if month_total_self_pay > 0 else 0
-                    allocated += int(alloc)
-                else:
-                    alloc = int(subsidy_amount - allocated)
-                post = int(max(0, sp - int(alloc)))
-                ev['post_subsidy_payment'] = post
-
-        # 6) assert sums match SSOT
-        sum_after = int(sum(int(e.get('post_subsidy_payment') or 0) for e in evs))
-        expected = int(bucket.get('post_subsidy_self_pay') or 0)
-        if sum_after != expected:
-            raise AssertionError(f"SUBSIDY ALLOCATION MISMATCH for {ym}: sum_after={sum_after} expected(post_subsidy_self_pay)={expected}")
+        # 4) For separation of concerns, leave per-event values unchanged
+        # (events retain their 'self_pay' and may have 'actual_payment').
+        # Rendering logic may compute per-event displayed values using the
+        # month-level bucket['post_subsidy_self_pay'].
 
     return monthly_map

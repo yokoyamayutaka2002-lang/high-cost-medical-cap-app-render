@@ -424,12 +424,37 @@
           </tr>
         </thead>
         <tbody>
-          <tr class="base-row"><th style="text-align:left">既存治療</th><td>{{ year1.base | yen }}</td><td>{{ ((year1.base / 12) | round(0) | int) | yen }}</td><td>{{ year2.base | yen }}</td><td>{{ ((year2.base / 12) | round(0) | int) | yen }}</td></tr>
-          <tr class="base-row"><th style="text-align:left">生物学的製剤</th><td>{{ year1.bio | yen }}</td><td>{{ ((year1.bio / 12) | round(0) | int) | yen }}</td><td>{{ year2.bio | yen }}</td><td>{{ ((year2.bio / 12) | round(0) | int) | yen }}</td></tr>
-          <tr class="diff-row"><th style="text-align:left">差額（生物学的製剤）</th><td>{{ year1.diff | yen }}</td><td>{{ ((year1.diff / 12) | round(0) | int) | yen }}</td><td>{{ year2.diff | yen }}</td><td>{{ ((year2.diff / 12) | round(0) | int) | yen }}</td></tr>
+          <tr class="base-row"><th style="text-align:left">既存治療</th>
+            <td>{{ (period_aggregates.calendar_start.existing_total_self_pay_annual | default(0)) | yen }}</td>
+            <td>{{ ((period_aggregates.calendar_start.existing_total_self_pay_annual | default(0) / 12) | round(0) | int) | yen }}</td>
+            <td>{{ (period_aggregates.calendar_next.existing_total_self_pay_annual | default(0)) | yen }}</td>
+            <td>{{ ((period_aggregates.calendar_next.existing_total_self_pay_annual | default(0) / 12) | round(0) | int) | yen }}</td>
+          </tr>
+          <tr class="base-row"><th style="text-align:left">生物学的製剤</th>
+            <td>{{ (period_aggregates.calendar_start.biologic_annual | default(0)) | yen }}</td>
+            <td>{{ ((period_aggregates.calendar_start.biologic_annual | default(0) / 12) | round(0) | int) | yen }}</td>
+            <td>{{ (period_aggregates.calendar_next.biologic_annual | default(0)) | yen }}</td>
+            <td>{{ ((period_aggregates.calendar_next.biologic_annual | default(0) / 12) | round(0) | int) | yen }}</td>
+          </tr>
+          <tr class="diff-row"><th style="text-align:left">差額（生物学的製剤）</th>
+            <td>{{ ((period_aggregates.calendar_start.biologic_annual | default(0)) - (period_aggregates.calendar_start.existing_total_self_pay_annual | default(0))) | yen }}</td>
+            <td>{{ (((period_aggregates.calendar_start.biologic_annual | default(0)) - (period_aggregates.calendar_start.existing_total_self_pay_annual | default(0))) / 12) | round(0) | int | yen }}</td>
+            <td>{{ ((period_aggregates.calendar_next.biologic_annual | default(0)) - (period_aggregates.calendar_next.existing_total_self_pay_annual | default(0))) | yen }}</td>
+            <td>{{ (((period_aggregates.calendar_next.biologic_annual | default(0)) - (period_aggregates.calendar_next.existing_total_self_pay_annual | default(0))) / 12) | round(0) | int | yen }}</td>
+          </tr>
           {% if benefit_enabled %}
-          <tr class="benefit-row"><th style="text-align:left">付加給付あり</th><td>{{ year1.after_benefit | yen }}</td><td>{{ ((year1.after_benefit / 12) | round(0) | int) | yen }}</td><td>{{ year2.after_benefit | yen }}</td><td>{{ ((year2.after_benefit / 12) | round(0) | int) | yen }}</td></tr>
-          <tr class="diff-row"><th style="text-align:left">差額（付加給付）</th><td>{{ year1.diff_after_benefit | yen }}</td><td>{{ ((year1.diff_after_benefit / 12) | round(0) | int) | yen }}</td><td>{{ year2.diff_after_benefit | yen }}</td><td>{{ ((year2.diff_after_benefit / 12) | round(0) | int) | yen }}</td></tr>
+          <tr class="benefit-row"><th style="text-align:left">付加給付あり</th>
+            <td>{{ (period_aggregates.calendar_start.biologic_with_subsidy_annual | default(0)) | yen }}</td>
+            <td>{{ ((period_aggregates.calendar_start.biologic_with_subsidy_annual | default(0) / 12) | round(0) | int) | yen }}</td>
+            <td>{{ (period_aggregates.calendar_next.biologic_with_subsidy_annual | default(0)) | yen }}</td>
+            <td>{{ ((period_aggregates.calendar_next.biologic_with_subsidy_annual | default(0) / 12) | round(0) | int) | yen }}</td>
+          </tr>
+          <tr class="diff-row"><th style="text-align:left">差額（付加給付）</th>
+            <td>{{ ((period_aggregates.calendar_start.biologic_with_subsidy_annual | default(0)) - (period_aggregates.calendar_start.existing_total_self_pay_annual | default(0))) | yen }}</td>
+            <td>{{ (((period_aggregates.calendar_start.biologic_with_subsidy_annual | default(0)) - (period_aggregates.calendar_start.existing_total_self_pay_annual | default(0))) / 12) | round(0) | int | yen }}</td>
+            <td>{{ ((period_aggregates.calendar_next.biologic_with_subsidy_annual | default(0)) - (period_aggregates.calendar_next.existing_total_self_pay_annual | default(0))) | yen }}</td>
+            <td>{{ (((period_aggregates.calendar_next.biologic_with_subsidy_annual | default(0)) - (period_aggregates.calendar_next.existing_total_self_pay_annual | default(0))) / 12) | round(0) | int | yen }}</td>
+          </tr>
           {% endif %}
           {% if medical_deduction_enabled %}
           <tr class="group-deduction deduction-row"><th style="text-align:left">医療費控除還付</th>
@@ -510,7 +535,7 @@
           <td style="text-align:right">{% if ev.get('raw_self') is not none %}¥{{ ev.get('raw_self') }}{% else %}—{% endif %}</td>
           <td style="text-align:right">{% if ev.get('actual_payment') is not none %}¥{{ ev.get('actual_payment') }}{% else %}—{% endif %}</td>
           {% if benefit_enabled %}
-          <td style="text-align:right">{% if ev.get('post_subsidy_payment') is not none %}¥{{ ev.get('post_subsidy_payment') }}{% else %}—{% endif %}</td>
+          <td style="text-align:right">{% if ev.get('display_post_subsidy_payment') is not none %}¥{{ ev.get('display_post_subsidy_payment') }}{% else %}—{% endif %}</td>
           {% endif %}
         </tr>
         {% endfor %}

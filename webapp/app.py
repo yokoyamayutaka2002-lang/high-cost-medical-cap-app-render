@@ -700,7 +700,8 @@ def calculate():
     existing_weekly_cost_yen = 0
     existing_dispense_weeks = 12
     existing_drug_name = ''
-
+    # 初期化: UnboundLocalError を防ぐため existing_only_annual を事前に 0 に設定
+    existing_only_annual = 0
     # existing drugs selection vs manual
     if include_existing:
         existing_mode = form.get('existing_mode')
@@ -1505,6 +1506,55 @@ def calculate():
                 'applied_limit': int(v.get('applied_limit') or 0),
             }
 
+    # Build display-only per-event subsidy allocation using month-level totals.
+    # Calculation SSOT: month_post_subsidy = min(sum(event.self_pay), subsidy_cap)
+    # Display rule: allocate the month_post_subsidy to events in chronological
+    # order; events after the month_post_subsidy is exhausted are shown as 0.
+    display_post_subsidy_map = {}
+    try:
+        cap_int = int(subsidy_cap) if subsidy_cap is not None else None
+    except Exception:
+        cap_int = None
+
+    for month in months_keys_sorted:
+        mm = monthly.get(month)
+        if not mm:
+            continue
+        evs = month_events_map.get(month, [])
+        # determine per-event self_pay (use actual_payment if present)
+        ev_selfs = [int(e.get('actual_payment') or e.get('raw_self') or 0) for e in evs]
+        month_total = sum(ev_selfs)
+        if cap_int is None:
+            month_post = month_total
+        else:
+            month_post = int(min(month_total, cap_int))
+
+        remaining = month_post
+        for idx, ev in enumerate(evs):
+            ev_self = ev_selfs[idx]
+            allocated = int(min(ev_self, remaining)) if remaining > 0 else 0
+            # key by (month, order, date_str) for robust matching
+            d = ev.get('date')
+            try:
+                date_key = d.isoformat() if hasattr(d, 'isoformat') else str(d)
+            except Exception:
+                date_key = str(d)
+            key = f"{month}|{int(ev.get('order') or 0)}|{date_key}"
+            display_post_subsidy_map[key] = int(allocated)
+            remaining -= allocated
+
+    # Annotate prescription schedule (display-only) so template can show per-event
+    # post-subsidy displayed values without changing calculation SSOTs.
+    if biologic_schedule:
+        for pe in biologic_schedule:
+            try:
+                month = pe['date'].strftime('%Y-%m')
+                date_key = pe['date'].isoformat() if hasattr(pe['date'], 'isoformat') else str(pe['date'])
+                key = f"{month}|{int(pe.get('order') or 0)}|{date_key}"
+                pe['display_post_subsidy_payment'] = display_post_subsidy_map.get(key, int(pe.get('final_pay') or pe.get('actual_payment') or 0))
+            except Exception:
+                pe['display_post_subsidy_payment'] = int(pe.get('final_pay') or pe.get('actual_payment') or 0)
+
     # Helper: iterate months between two dates (inclusive start, inclusive end by month)
     def months_between(start_dt, end_dt):
         # start_dt/end_dt are date or datetime
@@ -1571,9 +1621,10 @@ def calculate():
                 bio_raw += int(p.get('biologic_self_raw') or 0)
                 bio_after += int(p.get('biologic_self_after_cap') or 0)
                 bio_after_subsidy += int(p.get('biologic_self_after_subsidy') or 0)
-        # existing_annual is canonical external value (not derived from events)
-        # Use module-level canonical constant to avoid closure/scope issues
-        existing_annual = int(EXISTING_WEEKLY_COST_YEN * 52)
+        # existing_annual is derived from the selected existing treatments
+        # (weekly sum) rather than a module-level fixed constant so that
+        # the UI and calculations reflect the user's selected drugs.
+        existing_annual = int((existing_weekly_cost_yen or EXISTING_WEEKLY_COST_YEN) * 52)
         return {
             'existing_annual': existing_annual,
             'biologic_plus_annual': bio_after,
@@ -1654,15 +1705,35 @@ def calculate():
     tax_rate = _tax_rate_for_income(taxable_income)
 
     for (year, month_list, key) in ((cal_start_year, cal_start_months, 'calendar_start'), (cal_next_year, cal_next_months, 'calendar_next')):
-        # base_annual: canonical single source of truth
-        base_annual = int(sum(int(monthly.get(mm, {}).get('post_subsidy_self_pay') or 0) for mm in month_list))
-        period_aggregates[key]['annual_post_subsidy_self_pay'] = int(base_annual)
+        # Compute biologic-only annual (②): sum of per-month biologic_self_after_cap
+        biologic_annual = int(sum(int(per_month_patient.get(mm, {}).get('biologic_self_after_cap') or 0) for mm in month_list))
 
-        # Existing treatments are canonical external values
-        period_aggregates[key]['existing_total_self_pay_annual'] = int(EXISTING_WEEKLY_COST_YEN * 52)
+        # Compute biologic with subsidy annual (③): sum of month-level post_subsidy_self_pay
+        biologic_with_subsidy_annual = int(sum(int(monthly.get(mm, {}).get('post_subsidy_self_pay') or 0) for mm in month_list))
 
-        # Medical deduction calculations per spec
-        deductible = max(base_annual - 100000, 0)
+        period_aggregates[key]['biologic_annual'] = biologic_annual
+        period_aggregates[key]['biologic_with_subsidy_annual'] = biologic_with_subsidy_annual
+        period_aggregates[key]['annual_post_subsidy_self_pay'] = biologic_with_subsidy_annual
+
+        # Existing treatments MUST come from the form-selected weekly sum (SSOT①)
+        # Compute explicitly from `existing_weekly_cost_yen` and do not fall back
+        # to any module-level constant or silent zero. Raise on undefined.
+        if existing_weekly_cost_yen is None:
+            raise ValueError('existing_weekly_cost_yen is undefined; SSOT requires a selected existing weekly sum')
+        try:
+            existing_weekly_int = int(existing_weekly_cost_yen)
+        except Exception:
+            raise ValueError('existing_weekly_cost_yen is not an integer-like value')
+        existing_annual = int(existing_weekly_int) * 52
+        period_aggregates[key]['existing_weekly_cost_yen'] = existing_weekly_int
+        period_aggregates[key]['existing_total_self_pay_annual'] = int(existing_annual)
+        # Debug output required by spec
+        print(f"DEBUG_EXISTING: weekly={existing_weekly_int} annual={existing_annual}")
+
+        # Choose deduction base per SSOT: ② when no subsidy, ③ when subsidy used
+        deduction_base = biologic_with_subsidy_annual if use_subsidy else biologic_annual
+
+        deductible = max(int(deduction_base) - 100000, 0)
         income_tax_refund = int(round(deductible * tax_rate)) if deductible > 0 else 0
         resident_tax_refund = int(round(deductible * 0.10)) if deductible > 0 else 0
         total_refund = int((income_tax_refund or 0) + (resident_tax_refund or 0))
@@ -1675,7 +1746,7 @@ def calculate():
         period_aggregates[key]['medical_tax_refund_resident_monthly'] = int(round(resident_tax_refund / 12.0))
         period_aggregates[key]['medical_tax_refund_total_monthly'] = int(round(total_refund / 12.0))
 
-        after_medical_annual = int(max(base_annual - total_refund, 0))
+        after_medical_annual = int(max(int(deduction_base) - total_refund, 0))
         period_aggregates[key]['after_medical_annual_self_pay'] = int(after_medical_annual)
         period_aggregates[key]['after_medical_monthly_self_pay'] = int(round(after_medical_annual / 12.0))
 
@@ -1685,7 +1756,7 @@ def calculate():
         period_aggregates[key]['difference_after_medical'] = int(after_medical_annual - period_aggregates[key]['existing_total_self_pay_annual'])
 
         # Developer-friendly log
-        print(f"MED_DED: period={key} base_annual={base_annual} deductible={deductible} income_refund={income_tax_refund} resident_refund={resident_tax_refund} after_medical_annual={after_medical_annual}")
+        print(f"MED_DED: period={key} biologic_annual={biologic_annual} biologic_with_subsidy_annual={biologic_with_subsidy_annual} deduction_base={deduction_base} deductible={deductible} income_refund={income_tax_refund} resident_refund={resident_tax_refund} after_medical_annual={after_medical_annual}")
 
     # --- Recompute canonical year-level aggregates from month-level values ---
     # Disabled: existing-treatment aggregation by simple weekly arithmetic
@@ -1735,16 +1806,11 @@ def calculate():
                 else:
                     pe['final_pay'] = int(pe['actual_payment'])
 
-                # Always propagate the canonical per-event post-subsidy value
-                # (SSOT). Prefer explicit per-event `post_subsidy_payment`, then
-                # fall back to the matched `final_pay`, then to the local
-                # `final_pay`/`actual_payment` as a last resort.
-                if matched.get('post_subsidy_payment') is not None:
-                    pe['post_subsidy_payment'] = int(matched.get('post_subsidy_payment'))
-                elif matched.get('final_pay') is not None:
-                    pe['post_subsidy_payment'] = int(matched.get('final_pay'))
-                else:
-                    pe['post_subsidy_payment'] = int(pe.get('final_pay') or pe.get('actual_payment') or 0)
+                # For display/backwards compatibility, set an event-level
+                # placeholder `post_subsidy_payment` equal to the event's
+                # final_pay/actual_payment. NOTE: per-SSOT subsidy totals are
+                # computed at month level (see src.biologic_monthly.apply_monthly_subsidy_to_monthly_map).
+                pe['post_subsidy_payment'] = int(pe.get('final_pay') or pe.get('actual_payment') or 0)
                 biologic_events.append({'date': ev_date, 'gross': gross_val})
             else:
                 gross_val = int(qty * unit_price)
@@ -1778,8 +1844,11 @@ def calculate():
 
     # Summary numbers (UNIFIED RULES)
     # Canonical existing-weekly: enforced single source of truth
-    canonical_existing_weekly = EXISTING_WEEKLY_COST_YEN
-    existing_only_annual = int(EXISTING_WEEKLY_COST_YEN) * 52
+    # Prefer the user-selected existing weekly sum when available; fall
+    # back to the module-level default. This ensures display and
+    # calculations use the selected existing treatments (SSOT①).
+    canonical_existing_weekly = int(existing_weekly_cost_yen or EXISTING_WEEKLY_COST_YEN)
+    existing_only_annual = int(canonical_existing_weekly) * 52
     existing_only_monthly = int(round(existing_only_annual / 12.0))
 
     # biologic_post_cap_annual: the canonical "biologic" annual amount meaning
@@ -1917,8 +1986,10 @@ def calculate():
         pd = period_aggregates.get(pd_key, {})
         # base: existing-only annual (prefer explicit computed field)
         base = int(pd.get('existing_total_self_pay_annual') or pd.get('existing_annual') or 0)
-        # bio: combined self-pay annual (existing + biologic)
-        bio = int(pd.get('total_self_pay_annual') or (int(pd.get('existing_annual') or 0) + int(pd.get('biologic_plus_annual') or 0)))
+        # bio: biologic-only annual (SSOT②). Prefer the post-cap biologic
+        # annual (biologic_after_cap_annual) which corresponds to the
+        # per-event displayed `自己負担金額` sums.
+        bio = int(pd.get('biologic_after_cap_annual') or pd.get('biologic_plus_annual') or 0)
         diff = int(bio - base)
 
         # after_benefit: use the canonical combined post-subsidy annual value
@@ -2012,9 +2083,9 @@ def calculate():
     controllers = sorted(controllers, key=inhaled_sort_key)
     lamas = sorted(lamas, key=inhaled_sort_key)
 
-    # Verification: ensure existing-only amount is the canonical value
-    assert existing_only_annual == 836 * 52, \
-        f"Existing treatment calculation broken: {existing_only_annual}"
+    # Note: previous developer assertion forcing a hardcoded weekly value
+    # was removed because existing treatment is user-selectable and not a
+    # fixed constant in the UI-driven flow.
 
     # -------------------------
     # UI-only: build display summaries
@@ -2142,7 +2213,10 @@ def calculate():
         existing_only_annual=existing_only_annual,
         existing_only_monthly=round(existing_only_monthly),
         annual_existing_only=existing_only_annual,
-        annual_biologic=period_aggregates.get('calendar_start', {}).get('biologic_plus_annual', 0),
+        # SSOT-specific explicit annuals
+        existing_annual=period_aggregates.get('calendar_start', {}).get('existing_total_self_pay_annual', int(existing_only_annual)),
+        biologic_annual=period_aggregates.get('calendar_start', {}).get('biologic_annual', 0),
+        biologic_with_subsidy_annual=period_aggregates.get('calendar_start', {}).get('biologic_with_subsidy_annual', 0),
         annual_difference=difference,
         months=months_sorted,
         start_date=start_date,
