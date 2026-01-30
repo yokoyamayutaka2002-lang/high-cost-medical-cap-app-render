@@ -183,53 +183,7 @@
     /* Ensure result header isn't hidden behind fixed headers when scrolled to */
     #result-section { scroll-margin-top: 80px; }
   </style>
-  <style>
-    /* (card-style input-summary removed per UI change) */
-    /* Text summary for PDF/export (plain text block) */
-      .calc-summary {
-        margin: 15px 0 25px 0;
-        padding: 10px 15px;
-        background: #ffffff;
-        border: 1px solid #ddd;
-        font-size: 14px;
-        line-height: 1.6;
-      }
-    .calc-summary p { margin: 4px 0; }
-      /* Compact, print-friendly condition summary (three rows) */
-      .condition-summary { display:flex; flex-direction:column; gap:6px; }
-      .condition-summary .cs-row { display:flex; gap:18px; align-items:center; flex-wrap:nowrap; }
-      .condition-summary .cs-item { display:flex; gap:6px; align-items:center; white-space:nowrap; }
-      /* Ensure print output remains compact and avoids unexpected line-height expansion */
-      @media print {
-        .condition-summary { gap:4px; }
-        .condition-summary .cs-row { gap:12px; }
-        .calc-summary { padding:6px 8px; font-size:12px; }
-      }
-      /* Print rules: moved to head and strengthened to ensure Chrome applies page breaks */
-      @media print {
-        /* Hide all content by default to ensure only the desired sections are printed */
-        body * { visibility: hidden !important; }
-
-        /* Reveal only result-summary and prescription-schedule (and their children) */
-        .result-summary, .result-summary *,
-        .prescription-schedule, .prescription-schedule * {
-          visibility: visible !important;
-        }
-
-        /* Ensure visible blocks are positioned correctly and preserve page-breaks */
-        .result-summary { position: relative !important; top: 0; left: 0; display: block !important; page-break-after: always; break-after: page; }
-        .prescription-schedule { position: relative !important; top: 0; left: 0; display: block !important; page-break-before: always; break-before: page; page-break-inside: avoid; break-inside: avoid; }
-
-        /* Hide interactive/input UI as a fallback (if present) */
-        .screen-only { display: none !important; visibility: hidden !important; }
-
-        /* Allow table content to flow and avoid row-splitting */
-        .table-responsive { overflow: visible !important; }
-        table { page-break-inside: avoid; break-inside: avoid; }
-        thead { display: table-header-group; }
-        tr { page-break-inside: avoid; }
-      }
-  </style>
+  
 </head>
 <body>
   <div class="screen-only">
@@ -375,9 +329,7 @@
   {% endif %}
 
   {% if results %}
-  <h2 id="result-section">結果
-    <a href="/print" target="_blank" class="btn btn-secondary" style="margin-left:12px; font-size:0.95em; text-decoration:none;">印刷用表示</a>
-  </h2>
+  <h2 id="result-section">結果</h2>
   <div class="result-summary">
   <div class="calc-summary">
     <div class="condition-summary">
@@ -472,12 +424,37 @@
           </tr>
         </thead>
         <tbody>
-          <tr class="base-row"><th style="text-align:left">既存治療</th><td>{{ year1.base | yen }}</td><td>{{ ((year1.base / 12) | round(0) | int) | yen }}</td><td>{{ year2.base | yen }}</td><td>{{ ((year2.base / 12) | round(0) | int) | yen }}</td></tr>
-          <tr class="base-row"><th style="text-align:left">生物学的製剤</th><td>{{ year1.bio | yen }}</td><td>{{ ((year1.bio / 12) | round(0) | int) | yen }}</td><td>{{ year2.bio | yen }}</td><td>{{ ((year2.bio / 12) | round(0) | int) | yen }}</td></tr>
-          <tr class="diff-row"><th style="text-align:left">差額（生物学的製剤）</th><td>{{ year1.diff | yen }}</td><td>{{ ((year1.diff / 12) | round(0) | int) | yen }}</td><td>{{ year2.diff | yen }}</td><td>{{ ((year2.diff / 12) | round(0) | int) | yen }}</td></tr>
+          <tr class="base-row"><th style="text-align:left">既存治療</th>
+            <td>{{ (period_aggregates.calendar_start.existing_total_self_pay_annual | default(0)) | yen }}</td>
+            <td>{{ ((period_aggregates.calendar_start.existing_total_self_pay_annual | default(0) / 12) | round(0) | int) | yen }}</td>
+            <td>{{ (period_aggregates.calendar_next.existing_total_self_pay_annual | default(0)) | yen }}</td>
+            <td>{{ ((period_aggregates.calendar_next.existing_total_self_pay_annual | default(0) / 12) | round(0) | int) | yen }}</td>
+          </tr>
+          <tr class="base-row"><th style="text-align:left">生物学的製剤</th>
+            <td>{{ (period_aggregates.calendar_start.biologic_annual | default(0)) | yen }}</td>
+            <td>{{ ((period_aggregates.calendar_start.biologic_annual | default(0) / 12) | round(0) | int) | yen }}</td>
+            <td>{{ (period_aggregates.calendar_next.biologic_annual | default(0)) | yen }}</td>
+            <td>{{ ((period_aggregates.calendar_next.biologic_annual | default(0) / 12) | round(0) | int) | yen }}</td>
+          </tr>
+          <tr class="diff-row"><th style="text-align:left">差額（生物学的製剤）</th>
+            <td>{{ ((period_aggregates.calendar_start.biologic_annual | default(0)) - (period_aggregates.calendar_start.existing_total_self_pay_annual | default(0))) | yen }}</td>
+            <td>{{ (((period_aggregates.calendar_start.biologic_annual | default(0)) - (period_aggregates.calendar_start.existing_total_self_pay_annual | default(0))) / 12) | round(0) | int | yen }}</td>
+            <td>{{ ((period_aggregates.calendar_next.biologic_annual | default(0)) - (period_aggregates.calendar_next.existing_total_self_pay_annual | default(0))) | yen }}</td>
+            <td>{{ (((period_aggregates.calendar_next.biologic_annual | default(0)) - (period_aggregates.calendar_next.existing_total_self_pay_annual | default(0))) / 12) | round(0) | int | yen }}</td>
+          </tr>
           {% if benefit_enabled %}
-          <tr class="benefit-row"><th style="text-align:left">付加給付あり</th><td>{{ year1.after_benefit | yen }}</td><td>{{ ((year1.after_benefit / 12) | round(0) | int) | yen }}</td><td>{{ year2.after_benefit | yen }}</td><td>{{ ((year2.after_benefit / 12) | round(0) | int) | yen }}</td></tr>
-          <tr class="diff-row"><th style="text-align:left">差額（付加給付）</th><td>{{ year1.diff_after_benefit | yen }}</td><td>{{ ((year1.diff_after_benefit / 12) | round(0) | int) | yen }}</td><td>{{ year2.diff_after_benefit | yen }}</td><td>{{ ((year2.diff_after_benefit / 12) | round(0) | int) | yen }}</td></tr>
+          <tr class="benefit-row"><th style="text-align:left">付加給付あり</th>
+            <td>{{ (period_aggregates.calendar_start.biologic_with_subsidy_annual | default(0)) | yen }}</td>
+            <td>{{ ((period_aggregates.calendar_start.biologic_with_subsidy_annual | default(0) / 12) | round(0) | int) | yen }}</td>
+            <td>{{ (period_aggregates.calendar_next.biologic_with_subsidy_annual | default(0)) | yen }}</td>
+            <td>{{ ((period_aggregates.calendar_next.biologic_with_subsidy_annual | default(0) / 12) | round(0) | int) | yen }}</td>
+          </tr>
+          <tr class="diff-row"><th style="text-align:left">差額（付加給付）</th>
+            <td>{{ ((period_aggregates.calendar_start.biologic_with_subsidy_annual | default(0)) - (period_aggregates.calendar_start.existing_total_self_pay_annual | default(0))) | yen }}</td>
+            <td>{{ (((period_aggregates.calendar_start.biologic_with_subsidy_annual | default(0)) - (period_aggregates.calendar_start.existing_total_self_pay_annual | default(0))) / 12) | round(0) | int | yen }}</td>
+            <td>{{ ((period_aggregates.calendar_next.biologic_with_subsidy_annual | default(0)) - (period_aggregates.calendar_next.existing_total_self_pay_annual | default(0))) | yen }}</td>
+            <td>{{ (((period_aggregates.calendar_next.biologic_with_subsidy_annual | default(0)) - (period_aggregates.calendar_next.existing_total_self_pay_annual | default(0))) / 12) | round(0) | int | yen }}</td>
+          </tr>
           {% endif %}
           {% if medical_deduction_enabled %}
           <tr class="group-deduction deduction-row"><th style="text-align:left">医療費控除還付</th>
@@ -525,7 +502,7 @@
 
   {% if prescription_schedule %}
   <div class="prescription-schedule">
-  <h3>処方スケジュール</h3>
+  <h3 class="print-hide-title">処方スケジュール</h3>
   {% if xolair_display %}
   <div style="margin:6px 0 10px 0; font-weight:600">{{ xolair_display }}</div>
   {% endif %}
@@ -555,10 +532,10 @@
           <td style="text-align:left">{{ ev.date }}</td>
           <td style="text-align:center">{{ ev.qty }} {% if selected_drug and ('xolair' in selected_drug) %}回分{% else %}本{% endif %}</td>
           <td style="text-align:right">{{ days }}日 ({{ weeks }}週)</td>
-          <td style="text-align:right">{% if ev.get('raw_self') is not none %}¥{{ ev.get('raw_self') }}{% else %}—{% endif %}</td>
-          <td style="text-align:right">{% if ev.get('actual_payment') is not none %}¥{{ ev.get('actual_payment') }}{% else %}—{% endif %}</td>
+          <td style="text-align:right">{% if ev.get('pre_adjust_amount') is not none %}¥{{ ev.get('pre_adjust_amount') }}{% else %}¥0{% endif %}</td>
+          <td style="text-align:right">{% if ev.get('display_self_pay') is not none %}¥{{ ev.get('display_self_pay') }}{% else %}—{% endif %}</td>
           {% if benefit_enabled %}
-          <td style="text-align:right">{% if ev.get('post_subsidy_payment') is not none %}¥{{ ev.get('post_subsidy_payment') }}{% else %}—{% endif %}</td>
+          <td style="text-align:right">{% if ev.get('post_subsidy_self_pay') is not none %}¥{{ ev.get('post_subsidy_self_pay') }}{% else %}—{% endif %}</td>
           {% endif %}
         </tr>
         {% endfor %}
@@ -1024,8 +1001,8 @@ document.addEventListener('DOMContentLoaded', function(){
   });
 </script>
 {% endif %}
-</body>
-</html>
+</head>
+<body>
 <script>
 // Ensure system_version and income_category are sent: if empty, choose first option before submit.
 document.addEventListener('DOMContentLoaded', function(){
@@ -1043,3 +1020,69 @@ document.addEventListener('DOMContentLoaded', function(){
   }catch(e){/* ignore */}
 });
 </script>
+
+
+<style>
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  html, body {
+    width: 210mm;
+    height: 297mm;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  body {
+    font-size: 12px !important;
+    line-height: 1.4 !important;
+  }
+
+  /* 画面操作系は非表示 */
+  .screen-only, header, nav, .toolbar {
+    display: none !important;
+  }
+
+  /* 結果タイトルは消す */
+  h2#result-section {
+    display: none !important;
+  }
+
+  /* 表は1ページ内に */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: avoid !important;
+    line-height: 1.4 !important;
+  }
+
+  th, td {
+    padding: 5px 6px !important;
+    font-size: 11px !important;
+    line-height: 1.35 !important;
+    vertical-align: middle !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+  }
+
+  /* 処方スケジュールの「タイトルだけ」非表示 */
+  .print-hide-title {
+    display: none !important;
+  }
+}
+</style>
+
+</body>
+</html>
+

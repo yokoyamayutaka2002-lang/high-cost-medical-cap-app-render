@@ -8,47 +8,344 @@
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
       color: #000;
-      font-size: 12px;
+      font-size: 11.5px;
       margin: 0;
-      padding: 8mm;
+      padding: 6mm; /* 小さめにして印刷可能領域を最大化 */
       background: #fff;
+      line-height: 1.15;
     }
 
-    h2 { margin: 6px 0 8px 0; font-size: 16px; }
-    h3 { margin: 10px 0 6px 0; font-size: 14px; }
+    h2 { margin: 4px 0 6px 0; font-size: 14px; }
+    h3 { margin: 8px 0 4px 0; font-size: 13px; }
 
-    .section { margin-bottom: 8px; }
-    .kv { display: inline-block; margin-right: 18px; white-space: nowrap; }
+    .section { margin-bottom: 6px; }
+    .kv { display: inline-block; margin-right: 12px; white-space: nowrap; }
 
     table { width: 100%; border-collapse: collapse; font-size: 11px; }
-    th, td { border: 1px solid #000; padding: 4px 6px; text-align: right; white-space: nowrap; }
+    th, td { border: 1px solid #000; padding: 4px 6px; text-align: right; }
     th { background: #f0f0f0; text-align: center; }
     .text-left { text-align: left; }
 
     /* 印刷専用ルール */
-    @page { size: A4 landscape; margin: 12mm; }
+    /* Use A4 portrait for printing (attempt to fit both sections on one page) */
+    @page { size: A4 portrait; margin: 4mm; }
 
     @media print {
-      html, body { width: 297mm; height: 210mm; }
+      /* Portrait sheet dimensions */
+      html, body { width: 210mm; height: 297mm; margin: 0; padding: 0; }
 
-      /* Page 1: result-summary の後で改ページ */
-      .result-summary { page-break-after: always; break-after: page; }
+      /* 全体の余白を最小化してページに詰める */
+      body { padding: 0mm !important; font-size: 9px !important; }
 
-      /* Page 2: prescription-schedule を新しいページで開始 */
-      .prescription-schedule { page-break-before: always; break-before: page; }
+      /* result-summary を上へ詰める（印刷時のみ） */
+      .result-summary {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+        position: relative !important;
+        top: -16mm !important; /* さらに上に引き上げる（増量） */
+      }
 
-      /* 表や行の途中で切られないようにする */
-      table, tr { page-break-inside: avoid; break-inside: avoid; }
-      thead { display: table-header-group; }
+      /* 見出しの上余白をなくす */
+      .result-summary h2, .prescription-schedule h2 {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+      }
+
+      /* 印刷用タイムスタンプ等があれば非表示にする（サーバー側で生成される場合も含む） */
+      .print-timestamp, .timestamp, .page-timestamp, .print-header, .page-header, .top-info {
+        display: none !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        visibility: hidden !important;
+      }
+
+      /* セクション見出しや間隔をさらに圧縮 */
+      h2 { font-size: 12px !important; margin: 1px 0 3px 0 !important; }
+      h3 { font-size: 11px !important; margin: 2px 0 2px 0 !important; }
+      .section { margin-bottom: 2px !important; }
+      .kv { margin-right: 6px !important; font-size: 9px !important; }
+
+      /* 両方の主要テーブルに対して強めの圧縮を適用 */
+      .result-summary table,
+      .prescription-schedule table,
+      table.print-comparison {
+        width: 100% !important;
+        table-layout: fixed !important; /* colgroup の%幅を尊重 */
+        border-collapse: collapse !important;
+        box-sizing: border-box !important;
+        font-size: 8px !important; /* 更に小さくして1ページに収める */
+        line-height: 0.98 !important;
+      }
+
+      /* セルのパディングを最小限に */
+      .result-summary th, .result-summary td,
+      .prescription-schedule th, .prescription-schedule td,
+      table.print-comparison th, table.print-comparison td {
+        padding: 0.5px 2px !important;
+        vertical-align: top !important;
+        font-size: 8px !important;
+        border-width: 0.7px !important;
+      }
+
+      /* セクション間のスペースを削減 */
+      .result-summary { margin-bottom: 0 !important; }
+      .prescription-schedule { margin-top: 0 !important; }
+
+      /* 上部のキー情報をさらに圧縮 */
+      .result-summary .section, .result-summary .kv { margin-bottom: 0 !important; }
+      .result-summary .kv { display: inline-block; margin-right: 6px !important; }
+
+      /* 箇条書き等の余白を削る */
+      .result-summary ul, .result-summary li, .prescription-schedule ul, .prescription-schedule li {
+        margin: 0 !important; padding: 0 !important; list-style: none !important;
+      }
+
+      /* なるべくヘッダ高さを低くする */
+      table.print-comparison thead th, .result-summary thead th, .prescription-schedule thead th {
+        padding-top: 2px !important; padding-bottom: 2px !important; font-size: 8.5px !important;
+      }
+
+      /* 引き上げ（必要なら）: prescription を上に引っ張る小さな負マージン（ブラウザ依存だが効果あり） */
+      .prescription-schedule { margin-top: -6mm !important; }
+
+      /* 既存治療・生物学的製剤のリストを印刷時に横並びにする */
+      .result-summary ul {
+        margin: 0 !important;
+        padding-left: 0 !important;
+        list-style: none !important;
+      }
+      .result-summary ul li {
+        display: inline-block !important;
+        margin-right: 6px !important;
+        white-space: nowrap !important; /* 改行しない */
+      }
+
+      /* ラベル（例: 生物学的製剤：）とその直後の内容を改行させない */
+      .result-summary strong {
+        white-space: nowrap !important;
+      }
+
+      /* 1列目のみ折り返し可、その他は nowrap にして列幅を固定 */
+      .result-summary th:first-child, .result-summary td:first-child,
+      .prescription-schedule th:first-child, .prescription-schedule td:first-child,
+      table.print-comparison th:first-child, table.print-comparison td:first-child {
+        text-align: left !important;
+        white-space: normal !important;
+        word-break: break-word !important;
+      }
+      .result-summary th:not(:first-child), .result-summary td:not(:first-child),
+      .prescription-schedule th:not(:first-child), .prescription-schedule td:not(:first-child),
+      table.print-comparison th:not(:first-child), table.print-comparison td:not(:first-child) {
+        white-space: nowrap !important;
+        text-align: right !important;
+      }
+
+      /* 列幅を CSS で明示的に固定（colgroup を編集できない場合の代替） */
+      .result-summary table th:nth-child(1), .result-summary table td:nth-child(1),
+      .prescription-schedule table th:nth-child(1), .prescription-schedule table td:nth-child(1) {
+        width: 28% !important;
+      }
+      .result-summary table th:nth-child(2), .result-summary table td:nth-child(2),
+      .prescription-schedule table th:nth-child(2), .prescription-schedule table td:nth-child(2),
+      .result-summary table th:nth-child(3), .result-summary table td:nth-child(3),
+      .prescription-schedule table th:nth-child(3), .prescription-schedule table td:nth-child(3),
+      .result-summary table th:nth-child(4), .result-summary table td:nth-child(4),
+      .prescription-schedule table th:nth-child(4), .prescription-schedule table td:nth-child(4),
+      .result-summary table th:nth-child(5), .result-summary table td:nth-child(5),
+      .prescription-schedule table th:nth-child(5), .prescription-schedule table td:nth-child(5) {
+        width: 18% !important;
+      }
+
+      /* ヘッダ行繰り返し ・ 行分割を抑止 */
+      thead { display: table-header-group !important; }
+      tfoot { display: table-footer-group !important; }
+      tr { page-break-inside: avoid !important; break-inside: avoid !important; }
+
+      /* 親コンテナの外枠は保持しつつ中へ収める */
+      .card, .panel, .box { box-shadow: none !important; }
+
+      /* overflow によるクリッピングを防ぐ */
+      .table-responsive { overflow: visible !important; }
+
+      /* prescription-schedule 内の見出し／キャプションを印刷時に非表示にする */
+      .prescription-schedule h1,
+      .prescription-schedule h2,
+      .prescription-schedule h3,
+      .prescription-schedule h4,
+      .prescription-schedule .title,
+      .prescription-schedule .heading,
+      .prescription-schedule caption {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      /* prescription内でテーブルの直前にある文言（見出しのタグでない場合も含め）を非表示にする
+         例: <p>処方スケジュール</p> のような最初の要素を隠す */
+      .prescription-schedule .section > :first-child {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      /* テーブル内に見出し行が含まれている場合（単一セル・colspan 等）、印刷時に隠す */
+      .prescription-schedule table tr:first-child > th[colspan],
+      .prescription-schedule table tr:first-child > td[colspan],
+      .prescription-schedule table tr:first-child > td:only-child,
+      .prescription-schedule table tr:first-child > th:only-child {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
     }
 
+  </style>
+  <style>
+  @media print {
+
+    @page {
+      size: A4 portrait;
+      margin: 10mm;
+    }
+
+    body {
+      font-size: 12pt !important;
+      line-height: 1.5 !important;
+      margin-top: 0 !important;
+    }
+
+    h2, h3 {
+      margin-top: 6px !important;
+      margin-bottom: 8px !important;
+      line-height: 1.4 !important;
+    }
+
+    .summary-block,
+    .result-block {
+      margin-bottom: 14px !important;
+    }
+
+    table {
+      width: 100% !important;
+      table-layout: fixed !important;
+      margin-bottom: 16px !important;
+      page-break-inside: avoid !important;
+    }
+
+    th, td {
+      font-size: 11pt !important;
+      padding: 6px 6px !important;
+      line-height: 1.35 !important;
+      vertical-align: middle !important;
+    }
+
+    .print-hide-title {
+      display: none !important;
+    }
+  }
+  </style>
+  <style>
+    @media print {
+      /* 全体フォント/行間をより読みやすく再配分 */
+      html, body { width: 210mm; height: 297mm; margin: 0; padding: 0; }
+      body { font-size: 12pt !important; line-height: 1.45 !important; color: #000 !important; background: #fff !important; }
+
+      /* 上部サマリ領域の余白を再設定して上部に貼り付かないようにする */
+      .result-summary, .calc-summary, .condition-summary {
+        margin-top: 8mm !important;
+        margin-bottom: 6mm !important;
+        padding: 0 !important;
+      }
+
+      /* 見出しの余白と行間を広げる（印刷時） */
+      h2, h3 { margin-top: 6px !important; margin-bottom: 8px !important; line-height: 1.35 !important; }
+
+      /* 比較表と処方スケジュールの可読性を確保 */
+      .result-summary table,
+      .result-summary .table-responsive table,
+      .prescription-schedule table,
+      .prescription-schedule .table-responsive table,
+      table.print-comparison,
+      .cost-table {
+        width: 100% !important;
+        table-layout: fixed !important;
+        border-collapse: collapse !important;
+        font-size: 10pt !important;
+        line-height: 1.35 !important;
+        box-sizing: border-box !important;
+      }
+
+      .result-summary th, .result-summary td,
+      .prescription-schedule th, .prescription-schedule td,
+      .cost-table th, .cost-table td,
+      table.print-comparison th, table.print-comparison td {
+        padding: 4px 6px !important;
+        vertical-align: middle !important;
+        font-size: 10pt !important;
+        border-width: 0.7px !important;
+      }
+
+      /* 改ページ抑止 */
+      table, tr { page-break-inside: avoid !important; break-inside: avoid !important; }
+      thead { display: table-header-group !important; }
+
+      /* セクション間の余白を適度に確保 */
+      .result-summary + .prescription-schedule,
+      .result-summary .section,
+      .prescription-schedule { margin-bottom: 6mm !important; }
+      .section, .card { margin-bottom: 6mm !important; }
+
+      /* 処方スケジュールは表示を維持しつつ可読性を優先 */
+      .prescription-schedule { font-size: 10pt !important; }
+
+      /* 画面専用要素は印刷時に隠す（既存ルールと重複可） */
+      .screen-only, header, nav, .toolbar { display: none !important; visibility: hidden !important; }
+
+      /* 小さな列は折り返し、主要列は nowrap で安定させる */
+      .result-summary th:first-child, .result-summary td:first-child,
+      .prescription-schedule th:first-child, .prescription-schedule td:first-child {
+        white-space: normal !important; word-break: break-word !important;
+      }
+      .result-summary th:not(:first-child), .result-summary td:not(:first-child),
+      .prescription-schedule th:not(:first-child), .prescription-schedule td:not(:first-child) {
+        white-space: nowrap !important;
+      }
+
+      /* 既存の print-hide-title がある場合はそのまま尊重 */
+      .print-hide-title { display: none !important; }
+    }
+  </style>
+  <style>
+@page {
+  size: A4 portrait;
+  margin: 8mm 8mm 10mm 8mm;
+}
+@media print {
+  html, body { width: 210mm; height: 297mm; margin: 0; padding: 0; }
+  body { margin: 0 !important; padding: 0 !important; font-size: 12px !important; line-height: 1.45 !important; color: #000 !important; background: #fff !important; }
+  .container, .content, main { margin: 0 !important; padding: 0 !important; max-width: 100% !important; }
+  h2, h3 { margin-top: 6px !important; margin-bottom: 6px !important; line-height: 1.3 !important; }
+  table { width: 100% !important; table-layout: fixed !important; font-size: 11.5px !important; border-collapse: collapse !important; box-sizing: border-box !important; }
+  th, td { padding: 4px 6px !important; line-height: 1.35 !important; vertical-align: middle !important; }
+  .comparison-table { margin-bottom: 10px !important; }
+  .schedule-table { margin-top: 6px !important; }
+  table, tr, td, th { page-break-inside: avoid !important; break-inside: avoid !important; }
+  thead { display: table-header-group !important; }
+  .prescription-schedule { margin-top: 6px !important; }
+  .print-hide-title { display: none !important; }
+  .table-responsive { overflow: visible !important; }
+}
   </style>
 </head>
 <body>
 
   <!-- Page 1: 結果サマリ + 比較表 -->
   <div class="result-summary">
-    <h2>高額療養費シミュレーション 結果サマリ</h2>
 
     <div class="section">
       <div class="kv"><strong>開始日：</strong>{{ start_date }}</div>
@@ -73,7 +370,6 @@
   <!-- Page 2: 処方スケジュール（存在する場合のみ） -->
   {% if prescription_schedule %}
   <div class="prescription-schedule">
-    <h2>処方スケジュール</h2>
     <div class="section">
       {{ prescription_schedule_html | safe }}
     </div>

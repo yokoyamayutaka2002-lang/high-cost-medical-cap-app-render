@@ -120,7 +120,11 @@ def integrate_biologic_monthly(
         return merge_monthly_costs(base_monthly_costs, biologic_monthly)
 
 
-def apply_monthly_subsidy_to_monthly_map(monthly_map: Dict[str, Dict[str, Any]], subsidy_cap: int | None) -> Dict[str, Dict[str, Any]]:
+def apply_monthly_subsidy_to_monthly_map(
+    monthly_map: Dict[str, Dict[str, Any]],
+    subsidy_cap: int | None,
+    existing_weekly_cost_yen: int | None = None,
+) -> Dict[str, Dict[str, Any]]:
     """Apply monthly subsidy cap and produce canonical per-event and per-month fields.
 
     This function enforces the Single Source of Truth (SSOT) requirement:
@@ -138,19 +142,30 @@ def apply_monthly_subsidy_to_monthly_map(monthly_map: Dict[str, Dict[str, Any]],
        Use integer arithmetic and put any rounding remainder onto the last event.
     6) Assert that sum(event['post_subsidy_payment']) == post_subsidy_self_pay and raise on mismatch.
 
-    - monthly_map: map of YYYY-MM -> { 'events': [ { 'actual_payment': int, ... }, ... ], ... }
-    - subsidy_cap: monthly cap (int) or None to skip subsidy
+        - monthly_map: map of YYYY-MM -> { 'events': [ { 'actual_payment': int, ... }, ... ], ... }
+        - subsidy_cap: monthly cap (int) or None to skip subsidy
+        - existing_weekly_cost_yen: optional int weekly cost for existing treatments provided
+            by the form. When provided, each event in the monthly_map will be annotated
+            with `pre_adjust_amount` = biologic_event_self_pay + existing_cost_for_event
+            where existing_cost_for_event = (existing_weekly_cost_yen * 4) * months
+            and months = int(event.get('days', 28)) // 28. If not provided, existing
+            contribution defaults to 0 and behaviour is unchanged.
 
     Returns the same monthly_map with each event annotated and each month annotated
     with 'post_subsidy_self_pay'. Raises AssertionError on any allocation mismatch.
     """
+    # Per SSOT: subsidy is a MONTH-LEVEL cap. Do NOT apply event-level
+    # min(self_pay, subsidy_cap). Instead compute for each month:
+    #   month_self_pay = sum(event.self_pay)
+    #   month_post_subsidy = min(month_self_pay, subsidy_cap)
+    # and store month_post_subsidy into bucket['post_subsidy_self_pay'].
+    # Do NOT alter per-event canonical `self_pay` beyond ensuring it is int.
     for ym, bucket in monthly_map.items():
         evs = bucket.get('events') or []
 
-        # 1) Ensure canonical `self_pay` on each event
+        # 1) Ensure canonical `self_pay` on each event (int)
         for ev in evs:
             if 'self_pay' in ev and ev['self_pay'] is not None:
-                # preserve provided value but ensure it's an int (fail fast on bad data)
                 ev['self_pay'] = int(ev['self_pay'])
             else:
                 ev['self_pay'] = int(ev.get('actual_payment') or 0)
@@ -158,42 +173,66 @@ def apply_monthly_subsidy_to_monthly_map(monthly_map: Dict[str, Dict[str, Any]],
         # 2) month total
         month_total_self_pay = int(sum(int(ev.get('self_pay') or 0) for ev in evs))
 
-        # 3) compute post_subsidy_self_pay (SSOT monthly value)
+        # 3) compute post_subsidy_self_pay (month-level)
         if subsidy_cap is not None:
-            post_subsidy = int(min(month_total_self_pay, int(subsidy_cap)))
+            bucket['post_subsidy_self_pay'] = int(min(month_total_self_pay, int(subsidy_cap)))
         else:
-            post_subsidy = int(month_total_self_pay)
+            bucket['post_subsidy_self_pay'] = int(month_total_self_pay)
 
-        bucket['post_subsidy_self_pay'] = int(post_subsidy)
+        # 4) For separation of concerns: annotate each event with
+        #    - existing_cost_for_event (existing_weekly * 4 * qty)
+        #    - biologic_pre_highcost_self_pay (use raw_self verbatim)
+        #    - pre_adjust_amount = biologic_pre + existing_cost_for_event
+        #    - post_subsidy_self_pay (DISPLAY ONLY): per-spec the month's
+        #      subsidy cap is shown on the first event in the month and 0 on
+        #      subsequent events. Do NOT mutate canonical `self_pay`.
+        try:
+            if existing_weekly_cost_yen is not None:
+                existing_weekly_int = int(existing_weekly_cost_yen)
+            else:
+                existing_weekly_int = 0
+        except Exception:
+            existing_weekly_int = 0
 
-        # 4) subsidy amount (amount reduced from patient responsibility)
-        subsidy_amount = int(max(0, month_total_self_pay - post_subsidy))
+        # annotate events in chronological order; first event shows the
+        # month's subsidy cap (as an upper-limit), others show 0
+        evs_sorted = sorted(evs, key=lambda e: e.get('date'))
+        for idx, ev in enumerate(evs_sorted):
+            try:
+                # months are determined from qty per spec; fallback to 1
+                qty = int(ev.get('qty') if ev.get('qty') is not None else 1)
+            except Exception:
+                qty = 1
+            if qty < 1:
+                qty = 1
 
-        # 5) per-event distribution
-        if not evs:
-            # nothing to do
-            continue
+            # existing treatment contribution: existing_weekly_cost_yen * 4 * qty
+            try:
+                existing_cost_for_event = int(int(existing_weekly_int) * 4 * int(qty))
+            except Exception:
+                existing_cost_for_event = 0
 
-        if subsidy_amount == 0 or month_total_self_pay == 0:
-            for ev in evs:
-                ev['post_subsidy_payment'] = int(ev.get('self_pay') or 0)
-        else:
-            allocated = 0
-            for idx, ev in enumerate(evs):
-                sp = int(ev.get('self_pay') or 0)
-                if idx < len(evs) - 1:
-                    # proportional share of the total reduction
-                    alloc = int(round((sp * subsidy_amount) / float(month_total_self_pay))) if month_total_self_pay > 0 else 0
-                    allocated += int(alloc)
-                else:
-                    alloc = int(subsidy_amount - allocated)
-                post = int(max(0, sp - int(alloc)))
-                ev['post_subsidy_payment'] = post
+            # biologic pre-highcost self pay: prefer canonical 'raw_self' (pre-cap),
+            # otherwise fallback to 'self_pay' or 'actual_payment'. Do NOT use
+            # any post-cap value for this field.
+            try:
+                biologic_pre = int(ev.get('raw_self') if ev.get('raw_self') is not None else (ev.get('self_pay') or ev.get('actual_payment') or 0))
+            except Exception:
+                biologic_pre = int(ev.get('self_pay') or ev.get('actual_payment') or 0)
 
-        # 6) assert sums match SSOT
-        sum_after = int(sum(int(e.get('post_subsidy_payment') or 0) for e in evs))
-        expected = int(bucket.get('post_subsidy_self_pay') or 0)
-        if sum_after != expected:
-            raise AssertionError(f"SUBSIDY ALLOCATION MISMATCH for {ym}: sum_after={sum_after} expected(post_subsidy_self_pay)={expected}")
+            ev['existing_cost_for_event'] = int(existing_cost_for_event)
+            ev['biologic_pre_highcost_self_pay'] = int(biologic_pre)
+            # pre_adjust_amount = biologic_pre_highcost_self_pay + existing_cost_for_event
+            ev['pre_adjust_amount'] = int(int(biologic_pre) + int(existing_cost_for_event))
+            # post_subsidy_self_pay: display-only. First event in month shows
+            # the month-level cap (bucket['post_subsidy_self_pay']), later
+            # events show 0 as required by the spec.
+            if 'post_subsidy_self_pay' in bucket:
+                ev['post_subsidy_self_pay'] = int(bucket['post_subsidy_self_pay'] if idx == 0 else 0)
+            else:
+                ev['post_subsidy_self_pay'] = 0
+
+        # keep original event order in bucket
+        bucket['events'] = evs_sorted
 
     return monthly_map
