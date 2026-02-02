@@ -1057,8 +1057,21 @@ def calculate():
                     order += 1
                     cur = next_date
 
-                # Order 3 (base_weeks after order2)
-                third_date = cur + timedelta(weeks=base_weeks)
+                # Order 3: interval after order2 should depend on the prescription
+                # quantity for the second prescription (qty2). The original
+                # fallback used a fixed `base_weeks` step here which ignored
+                # the user-provided `qty2` and caused the third administration
+                # to be scheduled too early (e.g. when qty2==3 meaning 3×base_weeks).
+                #
+                # Fix: make the third date = order2_date + (qty2 * base_weeks).
+                # This aligns Xolair fallback behaviour with the canonical
+                # `build_prescription_schedule` rule: next_date = current_date +
+                # interval × prescribed_units.
+                try:
+                    step_multiplier = int(qty2)
+                except Exception:
+                    step_multiplier = 1
+                third_date = cur + timedelta(weeks=step_multiplier * base_weeks)
                 if third_date <= end_date:
                     try:
                         ev_days = int(int(qty3) * base_weeks * 7)
